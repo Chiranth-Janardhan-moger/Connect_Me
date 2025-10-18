@@ -12,7 +12,7 @@
 ### 1. Clone Repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Chiranth-Janardhan-moger/Connect_Me.git
 cd Connect_Me
 ```
 

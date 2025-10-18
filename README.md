@@ -36,4 +36,7 @@ npm install
 cd frontend
 npm install
 npx expo start
-`
+```
+# Screenshot of Figma
+
+<img width="1095" height="788" alt="image" src="https://github.com/user-attachments/assets/679b2381-0ab3-4372-bff6-e4d2fccd39a2" />

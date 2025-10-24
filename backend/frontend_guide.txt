@@ -1,0 +1,179 @@
+
+FRONTEND DEVELOPMENT FLOW & API/SOCKET GUIDE
+============================================
+
+This document outlines the step-by-step process for building the user interface, interacting with the backend API, and handling real-time data with WebSockets.
+
+--- Core Concepts ---
+
+1. Authentication:
+The app is protected. No user can access driver or student dashboards without logging in. Upon successful login, a JWT (JSON Web Token) is received and must be stored securely (e.g., in localStorage or sessionStorage). This token must be included in the Authorization header for all subsequent protected API calls.
+Header Format: Authorization: Bearer <your_jwt_token>
+
+2. Role-Based Rendering:
+After login, the app's entire flow diverges based on the user's role (student or driver). You should implement logic (e.g., a protected router) that directs the user to the correct dashboard and prevents access to the other.
+
+3. State Management:
+You'll need to manage global state, including:
+- user object (containing name, role, busId, etc.)
+- authToken
+- tripStatus (for drivers)
+- busLocation (for students)
+
+
+--- Step 1: Initial Setup & Authentication Flow ---
+
+This covers the first two screens in your design.
+
+Screen 1: Splash Screen
+- UI: Display the animated bus logo.
+- Logic:
+  1. On app load, show this screen for 2-3 seconds.
+  2. While the splash screen is visible, check localStorage for an existing authToken.
+  3. If a token exists: Validate it (e.g., by making a request to a protected endpoint like /api/student/live-location). If valid, redirect directly to the appropriate dashboard based on the stored user role. If invalid, clear storage and proceed to login.
+  4. If no token exists: Navigate to the Login Screen.
+
+Screen 2: Login Screen
+- UI: Email input, Password input, and a "Login" button.
+- Logic:
+  1. User enters credentials and clicks "Login".
+  2. Show a loading indicator.
+  3. Make API Call:
+     - Endpoint: POST /api/auth/login
+     - Method: POST
+     - Request Body:
+       {
+           "email": "entered_email",
+           "password": "entered_password"
+       }
+  4. Handle Response:
+     - On Success (200 OK):
+       - Receive the token and user object from the response.
+       - Store the token: localStorage.setItem('authToken', response.data.token);
+       - Store user info: localStorage.setItem('user', JSON.stringify(response.data.user));
+       - Check user.role.
+       - If user.role === 'student', navigate to the Student Dashboard.
+       - If user.role === 'driver', navigate to the Driver Dashboard.
+     - On Error (401, 404, 500):
+       - Hide the loading indicator.
+       - Display a user-friendly error message (e.g., "Invalid email or password.").
+
+
+--- Step 2: Student Flow ---
+
+This covers the third screen and the live tracking functionality.
+
+Screen 3: Student Dashboard
+- UI: As per your design, with the header and four icon buttons.
+- Logic:
+  1. The primary action is clicking the Bus Icon.
+  2. When the user clicks the Bus Icon, navigate to the Map View Screen.
+
+Map View Screen
+This is where the live tracking happens.
+
+1. Initial Status Check:
+   - When this screen loads, first check if the trip has even started.
+   - Make API Call:
+     - Endpoint: GET /api/student/live-location
+     - Method: GET
+     - Headers: Authorization: Bearer <student_token>
+   - Handle Response:
+     - On Success (200 OK): The trip is ON_ROUTE. The response contains the initial location. Use these coordinates to center the map and place the initial bus marker. Now, proceed to connect to the WebSocket.
+     - On Error (404 Not Found): The trip is NOT_STARTED or REACHED. Display a message on the screen like "The bus has not started its journey yet." or "The trip for today has ended." Do not connect to the WebSocket in this case.
+
+2. WebSocket Connection & Real-time Updates (only if trip is ON_ROUTE):
+   - Connect: Use the socket.io-client library to connect to the server.
+     
+     import { io } from 'socket.io-client';
+     const socket = io('http://your-backend-url'); // e.g., http://localhost:4000
+     
+   - Join Bus Room: Immediately after connecting, you must tell the server which bus updates you want to receive.
+     - Emit Event: student:join
+     - Payload: { busId: 'user.busId', studentId: 'user._id' } (Get these details from the stored user object).
+
+       const user = JSON.parse(localStorage.getItem('user'));
+       socket.emit('student:join', { busId: user.busId, studentId: user._id });
+
+   - Listen for Location Updates:
+     - Listen for Event: student:location-update
+     - Payload: { latitude, longitude, timestamp }
+     - Action: When this event is received, update the bus marker's position on the map with the new coordinates. This will create the live tracking effect.
+
+       socket.on('student:location-update', (data) => {
+         console.log('New location received:', data);
+         // Update state with data.latitude and data.longitude
+         // The map component will re-render the bus marker
+       });
+
+   - Listen for Trip Completion:
+     - Listen for Event: bus:reached
+     - Action: When this event is received, show a notification (e.g., "The bus has reached its destination!"). You should then disconnect from the socket and perhaps update the UI to show a "Trip Ended" state.
+
+   - Cleanup: When the user navigates away from the map screen, ensure you disconnect the socket to prevent memory leaks and unnecessary connections.
+     
+     // In a React component's cleanup effect
+     return () => {
+       socket.disconnect();
+     };
+
+
+--- Step 3: Driver Flow ---
+
+This covers the driver's dashboard and location broadcasting.
+
+Driver Dashboard Screen
+- UI: A simple screen with a header and a primary action button that changes based on the trip status.
+- Logic:
+  1. State Management: This screen needs a state variable, e.g., tripStatus, which can be `NOT_STARTED`, `ON_ROUTE`, or `REACHED`. You can initialize this to `REACHED` on first load after login.
+  2. Conditional Rendering:
+     - If tripStatus is ON_ROUTE, display the "End Trip" button.
+     - Otherwise (NOT_STARTED or REACHED), display the "Start Trip" button.
+
+"Start Trip" Flow
+1. User clicks the "Start Trip" button.
+2. Make API Call:
+   - Endpoint: POST /api/driver/start-trip
+   - Method: POST
+   - Headers: Authorization: Bearer <driver_token>
+3. Handle Response:
+   - On Success (200 OK):
+     - Update the tripStatus state to ON_ROUTE. The UI will automatically re-render to show the "End Trip" button.
+     - Crucially, this is when you start broadcasting the location.
+
+4. Location Broadcasting (via Geolocation & Sockets):
+   - Connect to Socket: Just like the student, connect to the WebSocket server.
+     
+     const socket = io('http://your-backend-url');
+
+   - Get Live Geolocation: Use the browser's Geolocation API to watch the device's position.
+     
+     navigator.geolocation.watchPosition(
+       (position) => { /* Handle success */ },
+       (error) => { /* Handle error */ },
+       { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+     );
+
+   - Emit Location Updates: Inside the watchPosition success callback, you will receive position objects. At a regular interval (e.g., every 5-10 seconds), emit these coordinates to the server.
+     - Emit Event: driver:location-update
+     - Payload: { busId: 'user.busId', latitude: position.coords.latitude, longitude: position.coords.longitude }
+
+       // Inside the watchPosition callback
+       const user = JSON.parse(localStorage.getItem('user'));
+       socket.emit('driver:location-update', {
+         busId: user.busId,
+         latitude: position.coords.latitude,
+         longitude: position.coords.longitude
+       });
+
+"End Trip" Flow
+1. User clicks the "End Trip" button.
+2. Make API Call:
+   - Endpoint: POST /api/driver/end-trip
+   - Method: POST
+   - Headers: Authorization: Bearer <driver_token>
+3. Handle Response:
+   - On Success (200 OK):
+     - Update tripStatus state to REACHED. The UI will re-render to show "Start Trip".
+     - Stop Broadcasting: Stop the geolocation watch (navigator.geolocation.clearWatch(watchId)).
+     - Disconnect from Socket: socket.disconnect().

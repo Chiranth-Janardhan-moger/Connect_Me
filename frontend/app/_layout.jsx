@@ -1,21 +1,25 @@
-
 import { Stack } from "expo-router";
 
 export default function RootLayout() {
-
   return (
     <Stack
       screenOptions={{
-        headerShown: false, // hide headers globally
-        animation: "fade",   // smoother transitions
+        headerShown: false,
+        animation: "fade",
       }}
     >
       {/* Splash screen */}
       <Stack.Screen name="index" />
 
-      {/* Auth and main screens */}
-      {/* <Stack.Screen name="login" /> */}
-      <Stack.Screen name="Home" />
+      {/* Auth screens */}
+      <Stack.Screen name="Login" />
+
+      {/* Dashboard screens */}
+      <Stack.Screen name="Student" />
+      <Stack.Screen name="Driver" />
+      <Stack.Screen name="Admin" />
+      
+      {/* Map screen */}
       <Stack.Screen name="Map" />
     </Stack>
   );

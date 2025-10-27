@@ -9,6 +9,7 @@
     "dev": "ts-node-dev src/server.ts",
     "seed": "ts-node src/scripts/seed.ts"
   },
+
   "keywords": [],
   "author": "",
   "license": "ISC",

@@ -19,7 +19,7 @@ export interface IBus extends MongooseDocument {
     // FIX: Explicitly define _id to prevent type errors
     _id: Types.ObjectId;
     busNumber: string;
-    routeId: Types.ObjectId;
+    routeNumber: number; // Changed from routeId to routeNumber
     driverId: Types.ObjectId;
     currentLat?: number;
     currentLon?: number;
@@ -36,7 +36,7 @@ const LocationHistorySchema: Schema = new Schema({
 
 const BusSchema: Schema = new Schema({
     busNumber: { type: String, required: true, unique: true },
-    routeId: { type: Schema.Types.ObjectId, ref: 'Route', required: true },
+    routeNumber: { type: Number, required: true }, // Changed from routeId to routeNumber
     driverId: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
     currentLat: { type: Number },
     currentLon: { type: Number },

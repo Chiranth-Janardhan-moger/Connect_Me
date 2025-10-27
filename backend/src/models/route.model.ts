@@ -12,6 +12,7 @@ interface IStop {
 export interface IRoute extends MongooseDocument {
     // FIX: Explicitly define _id to prevent type errors
     _id: Types.ObjectId;
+    routeNumber: number; // Primary identifier
     name: string;
     stops: IStop[];
 }
@@ -23,6 +24,7 @@ const StopSchema: Schema = new Schema({
 });
 
 const RouteSchema: Schema = new Schema({
+    routeNumber: { type: Number, required: true, unique: true }, // Primary identifier
     name: { type: String, required: true, unique: true },
     stops: { type: [StopSchema], required: true }
 });

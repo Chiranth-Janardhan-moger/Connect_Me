@@ -1,6 +1,6 @@
 
 import { Router } from 'express';
-import { addStudent, addDriver, addRoute } from '../controllers/admin.controller';
+import { addStudent, addDriver, addRoute, getAllRoutes } from '../controllers/admin.controller';
 import { verifyToken } from '../middlewares/auth.middleware';
 import { requireAdmin } from '../middlewares/role.middleware';
 
@@ -12,5 +12,6 @@ router.use(verifyToken, requireAdmin);
 router.post('/add-student', addStudent);
 router.post('/add-driver', addDriver);
 router.post('/add-route', addRoute);
+router.get('/routes', getAllRoutes);
 
 export default router;

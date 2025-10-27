@@ -8,10 +8,10 @@ import mongoose from 'mongoose';
 
 class AdminService {
     async addStudent(studentData: any): Promise<IUser> {
-        const { name, email, password, busId } = studentData;
+        const { name, email, password, rollNumber, routeNumber } = studentData;
 
-        if (!name || !email || !password || !busId) {
-            throw new Error('Missing required fields for student: name, email, password, busId.');
+        if (!name || !email || !password || !rollNumber || !routeNumber) {
+            throw new Error('Missing required fields for student: name, email, password, rollNumber, routeNumber.');
         }
         
         const existingUser = await userRepository.findByEmail(email);
@@ -19,34 +19,48 @@ class AdminService {
             throw new Error('Email already in use.');
         }
 
-        const bus = await busRepository.findById(busId);
-        if (!bus) {
-            throw new Error('Bus with the provided busId not found.');
+        const existingRollNumber = await userRepository.findByRollNumber(rollNumber);
+        if (existingRollNumber) {
+            throw new Error('Roll number already in use.');
+        }
+
+        // Validate route number is a positive integer
+        const routeNum = parseInt(routeNumber);
+        if (isNaN(routeNum) || routeNum <= 0) {
+            throw new Error('Route number must be a positive integer.');
         }
 
         const student = new User({
+            rollNumber,
             name,
             email,
             passwordHash: password, // Hashing is handled by pre-save middleware
             role: UserRole.STUDENT,
-            busId: bus._id
+            routeNumber: routeNum
         });
 
         return userRepository.save(student);
     }
 
     async addDriver(driverData: any): Promise<{ driver: IUser, bus: IBus }> {
-        const { name, email, password, busNumber, routeId } = driverData;
+        const { name, email, password, busNumber, routeNumber } = driverData;
 
-        if (!name || !email || !password || !busNumber || !routeId) {
-            throw new Error('Missing required fields: name, email, password, busNumber, routeId.');
+        if (!name || !email || !password || !busNumber || !routeNumber) {
+            throw new Error('Missing required fields: name, email, password, busNumber, routeNumber.');
         }
 
         if (await userRepository.findByEmail(email)) {
             throw new Error('Driver email already in use.');
         }
 
-        const route = await routeRepository.findById(routeId);
+        // Validate route number is a positive integer
+        const routeNum = parseInt(routeNumber);
+        if (isNaN(routeNum) || routeNum <= 0) {
+            throw new Error('Route number must be a positive integer.');
+        }
+
+        // Check if route exists
+        const route = await routeRepository.findByRouteNumber(routeNum);
         if (!route) {
             throw new Error('Route not found.');
         }
@@ -58,7 +72,7 @@ class AdminService {
 
         const newBus = new Bus({
             busNumber,
-            routeId,
+            routeNumber: routeNum,
             driverId: new mongoose.Types.ObjectId(), // Placeholder
         });
 
@@ -79,18 +93,33 @@ class AdminService {
     }
 
     async addRoute(routeData: any): Promise<IRoute> {
-        const { name, stops } = routeData;
-        if (!name || !stops || !Array.isArray(stops) || stops.length === 0) {
-            throw new Error('Route name and a non-empty array of stops are required.');
+        const { routeNumber, name, stops } = routeData;
+        if (!routeNumber || !name || !stops || !Array.isArray(stops) || stops.length === 0) {
+            throw new Error('Route number, name and a non-empty array of stops are required.');
+        }
+
+        // Validate route number is a positive integer
+        const routeNum = parseInt(routeNumber);
+        if (isNaN(routeNum) || routeNum <= 0) {
+            throw new Error('Route number must be a positive integer.');
         }
         
-        const existingRoute = await routeRepository.findByName(name);
+        const existingRoute = await routeRepository.findByRouteNumber(routeNum);
         if (existingRoute) {
+            throw new Error('A route with this number already exists.');
+        }
+
+        const existingRouteByName = await routeRepository.findByName(name);
+        if (existingRouteByName) {
             throw new Error('A route with this name already exists.');
         }
 
-        const route = new Route({ name, stops });
+        const route = new Route({ routeNumber: routeNum, name, stops });
         return routeRepository.save(route);
+    }
+
+    async getAllRoutes(): Promise<IRoute[]> {
+        return routeRepository.findAll();
     }
 }
 

@@ -19,6 +19,8 @@ class AuthService {
             id: user._id,
             role: user.role,
             busId: user.busId,
+            routeNumber: user.routeNumber,
+            rollNumber: user.rollNumber,
         };
 
         const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '1d' });
@@ -30,6 +32,8 @@ class AuthService {
                 name: user.name,
                 role: user.role,
                 busId: user.busId,
+                routeNumber: user.routeNumber,
+                rollNumber: user.rollNumber,
             },
         };
     }

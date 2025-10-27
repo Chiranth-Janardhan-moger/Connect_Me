@@ -1,5 +1,6 @@
 
 import Bus, { IBus } from '../../models/bus.model';
+import routeRepository from './route.repository';
 
 class BusRepository {
     async findByDriverId(driverId: string): Promise<IBus | null> {
@@ -16,6 +17,14 @@ class BusRepository {
     
     async findByBusNumber(busNumber: string): Promise<IBus | null> {
         return Bus.findOne({ busNumber }).exec();
+    }
+
+    async findByRouteNumber(routeNumber: number): Promise<IBus | null> {
+        return Bus.findOne({ routeNumber }).exec();
+    }
+
+    async findRouteByNumber(routeNumber: number) {
+        return routeRepository.findByRouteNumber(routeNumber);
     }
 
     async save(bus: IBus): Promise<IBus> {

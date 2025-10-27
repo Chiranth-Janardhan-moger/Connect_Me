@@ -9,9 +9,17 @@ class RouteRepository {
     async findByName(name: string): Promise<IRoute | null> {
         return Route.findOne({ name }).exec();
     }
+
+    async findByRouteNumber(routeNumber: number): Promise<IRoute | null> {
+        return Route.findOne({ routeNumber }).exec();
+    }
     
     async findById(id: string | Types.ObjectId): Promise<IRoute | null> {
         return Route.findById(id).exec();
+    }
+
+    async findAll(): Promise<IRoute[]> {
+        return Route.find().exec();
     }
 }
 

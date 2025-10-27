@@ -8,7 +8,9 @@ declare global {
             user?: {
                 id: string;
                 role: UserRole;
-                busId: Types.ObjectId;
+                busId?: Types.ObjectId;
+                routeNumber?: number;
+                rollNumber?: string;
             };
         }
     }

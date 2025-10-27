@@ -1,5 +1,3 @@
-
-
 import mongoose, { Schema, Document as MongooseDocument, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
@@ -9,19 +7,28 @@ export enum UserRole {
     ADMIN = 'admin'
 }
 
-// FIX: Alias Document to MongooseDocument to avoid name collision with DOM's Document type.
 export interface IUser extends MongooseDocument {
-    // FIX: Explicitly define _id to prevent type errors
     _id: Types.ObjectId;
+    rollNumber?: string; // Optional for admin and drivers, required for students
     name: string;
     email: string;
     passwordHash: string;
     role: UserRole;
     busId?: Types.ObjectId; // busId is optional for admin
+    routeNumber?: number; // route number for students
     comparePassword(password: string): Promise<boolean>;
 }
 
 const UserSchema: Schema = new Schema({
+    rollNumber: { 
+        type: String,
+        sparse: true,  // Only index documents where this field exists
+        unique: true,  // Ensure uniqueness among students
+        required: function(this: any) {
+            // Required only if the role is student
+            return this.role === UserRole.STUDENT;
+        }
+    },
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
@@ -29,12 +36,19 @@ const UserSchema: Schema = new Schema({
     busId: { 
         type: Schema.Types.ObjectId, 
         ref: 'Bus', 
-        required: function(this: IUser) {
-            // Required only if the role is student or driver
-            return this.role === UserRole.STUDENT || this.role === UserRole.DRIVER;
+        required: function(this: any) {
+            // Required only if the role is driver
+            return this.role === UserRole.DRIVER;
+        }
+    },
+    routeNumber: {
+        type: Number,
+        required: function(this: any) {
+            // Required only if the role is student
+            return this.role === UserRole.STUDENT;
         }
     }
-});
+} as any);
 
 UserSchema.pre<IUser>('save', async function (next) {
     if (!this.isModified('passwordHash')) {

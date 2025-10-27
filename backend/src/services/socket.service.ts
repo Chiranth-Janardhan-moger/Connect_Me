@@ -43,7 +43,7 @@ export const initializeSocket = (httpServer: HttpServer) => {
             if (!busId || latitude === undefined || longitude === undefined) return;
             
             try {
-                const bus = await busRepository.findByIdAndPopulate(busId, 'routeId');
+                const bus = await busRepository.findById(busId);
                 if (!bus || bus.tripStatus !== TripStatus.ON_ROUTE) {
                     // If trip ended, notify driver to stop sending updates
                     if(bus && bus.tripStatus === TripStatus.REACHED) {
@@ -66,7 +66,8 @@ export const initializeSocket = (httpServer: HttpServer) => {
                 });
                 
                 // Check if bus has reached destination
-                const route = bus.routeId as any; // Cast to access populated fields
+                // We need to fetch the route by routeNumber since we changed the model
+                const route = await busRepository.findRouteByNumber(bus.routeNumber);
                 if (route && route.stops && route.stops.length > 0) {
                     const lastStop = route.stops[route.stops.length - 1];
                     const distance = calculateDistance(latitude, longitude, lastStop.lat, lastStop.lon);

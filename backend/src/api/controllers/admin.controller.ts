@@ -51,3 +51,12 @@ export const addRoute = async (req: Request, res: Response) => {
         handleServiceError(error, res);
     }
 };
+
+export const getAllRoutes = async (req: Request, res: Response) => {
+    try {
+        const routes = await adminService.getAllRoutes();
+        res.status(200).json({ routes });
+    } catch (error) {
+        handleServiceError(error, res);
+    }
+};

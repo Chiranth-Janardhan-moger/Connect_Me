@@ -6,7 +6,9 @@ import config from '../../config';
 interface JwtPayload {
     id: string;
     role: any;
-    busId: any;
+    busId?: any;
+    routeNumber?: number;
+    rollNumber?: string;
 }
 
 export const verifyToken = (req: Request, res: Response, next: NextFunction) => {
@@ -23,6 +25,8 @@ export const verifyToken = (req: Request, res: Response, next: NextFunction) => 
             id: decoded.id,
             role: decoded.role,
             busId: decoded.busId,
+            routeNumber: decoded.routeNumber,
+            rollNumber: decoded.rollNumber,
         };
         next();
     } catch (error) {

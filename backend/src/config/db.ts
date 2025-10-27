@@ -1,6 +1,5 @@
 // Fix: Add a triple-slash directive to include Node.js types and resolve type conflicts.
 /// <reference types="node" />
-
 import mongoose from 'mongoose';
 import config from './index';
 

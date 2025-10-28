@@ -31,6 +31,7 @@ export const getSocket = () => {
   }
   return socket;
 };
+
 export const connectDriverSocket = () => {
   const socket = getSocket();
   if (!socket.connected) {
@@ -48,12 +49,14 @@ export const disconnectSocket = () => {
 };
 
 // Student Socket Methods
-export const joinBusRoom = (busId, studentId) => {
+// Updated to accept either busId or routeNumber (they're the same thing)
+export const joinBusRoom = (routeNumber, studentId) => {
   const socket = getSocket();
   if (socket) {
     socket.connect();
-    socket.emit('student:join', { busId, studentId });
-    console.log('📍 Joined bus room:', busId);
+    // Use routeNumber as busId since student's route = bus route
+    socket.emit('student:join', { busId: routeNumber, studentId });
+    console.log('📍 Joined bus room (Route):', routeNumber);
   }
 };
 
@@ -72,15 +75,15 @@ export const listenToBusReached = (callback) => {
 };
 
 // Driver Socket Methods
-export const emitDriverLocation = (busId, latitude, longitude) => {
+// Updated to accept routeNumber as busId
+export const emitDriverLocation = (routeNumber, latitude, longitude) => {
   const socket = getSocket();
   if (socket && socket.connected) {
     socket.emit('driver:location-update', {
-      busId,
+      busId: routeNumber, // Route number = Bus ID
       latitude,
       longitude,
     });
-    console.log('📡 Location emitted:', latitude, longitude);
+    console.log('📡 Location emitted for route:', routeNumber, latitude, longitude);
   }
 };
-

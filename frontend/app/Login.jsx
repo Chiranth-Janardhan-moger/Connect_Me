@@ -12,9 +12,11 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../src/config/api';  // Import API
+import * as Location from 'expo-location';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -68,6 +70,10 @@ export default function LoginScreen() {
         // Navigate based on role
         switch (response.data.user.role) {
           case 'student':
+            // Ask for location permission up-front (no watchers started here)
+            try {
+              await Location.requestForegroundPermissionsAsync();
+            } catch {}
             router.replace('/Student');
             break;
           case 'driver':
@@ -110,15 +116,19 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.safe}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={'padding'}
+        keyboardVerticalOffset={0}
       >
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
         <View style={styles.content}>
           <View style={styles.header}>
             <Text style={styles.title}>Welcome Back</Text>
@@ -186,18 +196,28 @@ export default function LoginScreen() {
             <Text style={styles.footerText}>Dont have an account? Contact your administrator.</Text>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scroll: {
     flex: 1,
     backgroundColor: '#fff',
   },
   scrollContent: {
     flexGrow: 1,
+    backgroundColor: '#fff',
   },
   content: {
     flex: 1,

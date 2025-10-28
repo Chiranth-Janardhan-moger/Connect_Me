@@ -5,13 +5,14 @@ import {
   StyleSheet, 
   StatusBar, 
   TouchableOpacity, 
-  ScrollView, 
-  Image,
   ActivityIndicator,
   Alert 
 } from 'react-native';
-import MapView, { Polyline, Marker } from 'react-native-maps';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import MapView, { Polyline, Marker, AnimatedRegion } from 'react-native-maps';
+import * as Location from 'expo-location';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { studentAPI } from '../src/config/api';
 import {
@@ -21,8 +22,8 @@ import {
   disconnectSocket,
 } from '../src/config/socket';
 
-// Mock data - Replace this with your database/API call
-const ROUTE_DATA = {
+// Bangalore stops data
+const BANGALORE_STOPS = {
   1: {
     routeId: 1,
     routeName: "Route-1",
@@ -32,11 +33,13 @@ const ROUTE_DATA = {
       { id: 3, name: "Jakkur Cross", lat: 13.0850, lng: 77.5980, time: "06:20 AM" },
       { id: 4, name: "Hebbal Flyover", lat: 13.0358, lng: 77.5970, time: "06:35 AM" },
       { id: 5, name: "Mekhri Circle", lat: 13.0157, lng: 77.5850, time: "06:50 AM" },
+      { id: 6, name: "Cubbon Park", lat: 12.9767, lng: 77.5923, time: "07:05 AM" },
+      { id: 7, name: "MG Road", lat: 12.9716, lng: 77.5946, time: "07:15 AM" },
     ]
   },
   2: {
     routeId: 2,
-    routeName: "Route-2",
+    routeName: "Route-2", 
     stops: [
       { id: 1, name: "BMSIT College", lat: 13.133845, lng: 77.568760, time: "06:30 AM" },
       { id: 2, name: "Puttenahalli Cross", lat: 13.0920, lng: 77.6020, time: "06:40 AM" },
@@ -44,225 +47,482 @@ const ROUTE_DATA = {
       { id: 4, name: "Nagavara", lat: 13.0520, lng: 77.6150, time: "07:05 AM" },
       { id: 5, name: "Hennur Cross", lat: 13.0380, lng: 77.6380, time: "07:20 AM" },
       { id: 6, name: "Tin Factory", lat: 13.0280, lng: 77.6280, time: "07:30 AM" },
-    ]
-  },
-  3: {
-    routeId: 3,
-    routeName: "Route-3",
-    stops: [
-      { id: 1, name: "Yelahanka", lat: 13.1007, lng: 77.5963, time: "07:00 AM" },
-      { id: 2, name: "Attur", lat: 13.0720, lng: 77.5820, time: "07:15 AM" },
-      { id: 3, name: "Sadashivanagar", lat: 13.0100, lng: 77.5750, time: "07:30 AM" },
-      { id: 4, name: "Majestic", lat: 12.9767, lng: 77.5713, time: "07:50 AM" },
+      { id: 7, name: "KR Puram", lat: 13.0100, lng: 77.6200, time: "07:45 AM" },
+      { id: 8, name: "Whitefield", lat: 12.9700, lng: 77.7500, time: "08:00 AM" },
     ]
   },
 };
 
 export default function Map() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const routeId = params.routeId || '2';
   const mapRef = useRef(null);
+  const insets = useSafeAreaInsets();
   
-  const [viewMode, setViewMode] = useState('map');
   const [loading, setLoading] = useState(true);
-  const [tripStatus, setTripStatus] = useState('NOT_STARTED'); // NOT_STARTED, ON_ROUTE, REACHED
+  const [tripStatus, setTripStatus] = useState('NOT_STARTED');
   const [busLocation, setBusLocation] = useState(null);
+  const [studentLocation, setStudentLocation] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [isSocketConnected, setIsSocketConnected] = useState(false);
+  const [etaText, setEtaText] = useState(null);
+  const [distanceText, setDistanceText] = useState(null);
   
-  const routeData = ROUTE_DATA[routeId] || ROUTE_DATA[2];
+  // Animated coordinates
+  const busAnimatedCoord = useRef(null);
+  const studentAnimatedCoord = useRef(null);
   
-  // Polyline coordinates from stops
-  const polylineCoords = routeData.stops.map(stop => ({
-    latitude: stop.lat,
-    longitude: stop.lng,
-  }));
+  // Location tracking refs
+  const locationSubscription = useRef(null);
+  const hasCenteredOnStudent = useRef(false);
+  const lastUpdateTime = useRef(Date.now());
   
-  const initialRegion = {
-    latitude: routeData.stops[0].lat,
-    longitude: routeData.stops[0].lng,
-    latitudeDelta: 0.15,
-    longitudeDelta: 0.15,
+  // Route data
+  const [routeData, setRouteData] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(true);
+  
+  // Fetch route data
+  const fetchRouteData = async () => {
+    try {
+      setRouteLoading(true);
+      const response = await studentAPI.getRouteInfo();
+      
+      if (response.ok && response.data) {
+        const routeNumber = response.data.routeNumber;
+        const localRouteData = BANGALORE_STOPS[routeNumber];
+        
+        if (localRouteData) {
+          setRouteData(localRouteData);
+        } else {
+          console.error('Route not found:', routeNumber);
+          Alert.alert('Error', 'Route information not available.');
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching route:', error);
+      Alert.alert('Error', 'Failed to load route information.');
+    } finally {
+      setRouteLoading(false);
+    }
   };
+  
+  // Calculate distance between two points (Haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Earth radius in meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-  useEffect(() => {
-    checkTripStatus();
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    // Cleanup: disconnect socket when component unmounts
-    return () => {
-      console.log('🔌 Cleaning up socket connection');
-      disconnectSocket();
-    };
-  });
+    return R * c; // Distance in meters
+  };
+  
+  // Fetch ETA using Google Distance Matrix API
+  const fetchETA = async (origin, destination) => {
+    try {
+      const apiKey = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+      
+      if (!apiKey) {
+        console.warn('Google Maps API key not configured');
+        // Fallback: Calculate simple ETA based on distance
+        const distance = calculateDistance(
+          origin.latitude, 
+          origin.longitude, 
+          destination.latitude, 
+          destination.longitude
+        );
+        
+        // Assume average speed of 20 km/h in city traffic
+        const avgSpeedMps = 20000 / 3600; // 20 km/h to m/s
+        const etaSeconds = distance / avgSpeedMps;
+        const etaMinutes = Math.round(etaSeconds / 60);
+        
+        setDistanceText(`${(distance / 1000).toFixed(1)} km`);
+        setEtaText(etaMinutes < 1 ? 'Less than 1 min' : `${etaMinutes} mins`);
+        return;
+      }
+      
+      const origins = `${origin.latitude},${origin.longitude}`;
+      const destinations = `${destination.latitude},${destination.longitude}`;
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?units=metric&origins=${encodeURIComponent(origins)}&destinations=${encodeURIComponent(destinations)}&departure_time=now&traffic_model=best_guess&key=${apiKey}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.rows[0]?.elements[0]) {
+        const element = data.rows[0].elements[0];
+        
+        if (element.status === 'OK') {
+          // Use duration_in_traffic if available, otherwise use duration
+          const duration = element.duration_in_traffic || element.duration;
+          const distance = element.distance;
+          
+          setEtaText(duration?.text || 'Calculating...');
+          setDistanceText(distance?.text || '');
+        } else {
+          // Fallback to simple calculation
+          const distance = calculateDistance(
+            origin.latitude, origin.longitude,
+            destination.latitude, destination.longitude
+          );
+          const avgSpeedMps = 20000 / 3600;
+          const etaMinutes = Math.round((distance / avgSpeedMps) / 60);
+          setDistanceText(`${(distance / 1000).toFixed(1)} km`);
+          setEtaText(`${etaMinutes} mins`);
+        }
+      }
+    } catch (error) {
+      console.error('ETA fetch error:', error);
+      // Fallback calculation
+      const distance = calculateDistance(
+        origin.latitude, origin.longitude,
+        destination.latitude, destination.longitude
+      );
+      const avgSpeedMps = 20000 / 3600;
+      const etaMinutes = Math.round((distance / avgSpeedMps) / 60);
+      setDistanceText(`${(distance / 1000).toFixed(1)} km`);
+      setEtaText(`${etaMinutes} mins`);
+    }
+  };
+  
+  // Get accurate student location with proper filtering
+  const getStudentLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.warn('Location permission not granted');
+        setStatusMessage('Location permission required');
+        return;
+      }
 
+      // Get initial position
+      const initialPosition = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.BestForNavigation,
+        maximumAge: 0,
+      });
+
+      const initialLocation = {
+        latitude: initialPosition.coords.latitude,
+        longitude: initialPosition.coords.longitude,
+      };
+
+      setStudentLocation(initialLocation);
+      
+      // Initialize animated coordinate
+      if (!studentAnimatedCoord.current) {
+        studentAnimatedCoord.current = new AnimatedRegion({
+          latitude: initialLocation.latitude,
+          longitude: initialLocation.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        });
+      }
+
+      // Center map on student location once
+      if (mapRef.current && !hasCenteredOnStudent.current) {
+        hasCenteredOnStudent.current = true;
+        setTimeout(() => {
+          mapRef.current?.animateToRegion({
+            ...initialLocation,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          }, 1000);
+        }, 500);
+      }
+
+      // Start watching position with optimized settings
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 2000, // Update every 2 seconds
+          distanceInterval: 5, // Or when moved 5 meters
+        },
+        (position) => {
+          const now = Date.now();
+          const timeDelta = now - lastUpdateTime.current;
+          
+          // Only update if enough time has passed and position is accurate
+          if (timeDelta < 1500 || !position.coords.accuracy || position.coords.accuracy > 20) {
+            return;
+          }
+          
+          const newLocation = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          };
+
+          // Check if movement is significant (more than 3 meters)
+          if (studentLocation) {
+            const distance = calculateDistance(
+              studentLocation.latitude,
+              studentLocation.longitude,
+              newLocation.latitude,
+              newLocation.longitude
+            );
+            
+            // Ignore tiny movements (GPS drift)
+            if (distance < 3) {
+              return;
+            }
+          }
+
+          lastUpdateTime.current = now;
+          setStudentLocation(newLocation);
+
+          // Smooth animation
+          if (studentAnimatedCoord.current) {
+            studentAnimatedCoord.current.timing({
+              latitude: newLocation.latitude,
+              longitude: newLocation.longitude,
+              duration: 1500,
+              useNativeDriver: false,
+            }).start();
+          }
+        }
+      );
+
+    } catch (error) {
+      console.error('Failed to get student location:', error);
+      Alert.alert('Location Error', 'Failed to get your location. Please check your GPS settings.');
+    }
+  };
+  
+  // Check trip status
   const checkTripStatus = async () => {
     try {
       setLoading(true);
-      console.log('📡 Checking trip status...');
+      console.log('Checking trip status...');
       
       const response = await studentAPI.getLiveLocation();
 
       if (response.ok && response.data) {
-        // Trip is ON_ROUTE
-        console.log('✅ Trip is ON_ROUTE');
-        console.log('📍 Initial location:', response.data);
-        
+        console.log('Trip is ON_ROUTE');
         setTripStatus('ON_ROUTE');
-        setBusLocation({
-          latitude: response.data.latitude,
-          longitude: response.data.longitude,
-        });
         
-        // Center map on bus location
-        if (mapRef.current) {
-          mapRef.current.animateToRegion({
-            latitude: response.data.latitude,
-            longitude: response.data.longitude,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }, 1000);
+        const newLocation = {
+          latitude: parseFloat(response.data.latitude),
+          longitude: parseFloat(response.data.longitude),
+        };
+        
+        setBusLocation(newLocation);
+        
+        // Initialize bus animated coordinate
+        if (!busAnimatedCoord.current) {
+          busAnimatedCoord.current = new AnimatedRegion({
+            latitude: newLocation.latitude,
+            longitude: newLocation.longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          });
         }
         
-        // Connect to WebSocket for real-time updates
+        // Center map on bus
+        setTimeout(() => {
+          if (mapRef.current) {
+            mapRef.current.animateToRegion({
+              latitude: newLocation.latitude,
+              longitude: newLocation.longitude,
+              latitudeDelta: 0.02,
+              longitudeDelta: 0.02,
+            }, 1000);
+          }
+        }, 500);
+        
         await setupWebSocket();
       } else if (response.status === 404) {
-        // Trip NOT_STARTED or REACHED
-        console.log('❌ Trip not started or already reached');
+        console.log('Trip not started');
         setTripStatus('NOT_STARTED');
         setStatusMessage('The bus has not started its journey yet.');
       } else {
+        setTripStatus('NOT_STARTED');
         setStatusMessage('Unable to fetch bus location. Please try again.');
       }
     } catch (error) {
-      console.error('❌ Error checking trip status:', error);
+      console.error('Error checking trip status:', error);
+      setTripStatus('NOT_STARTED');
       setStatusMessage('Unable to fetch bus location. Please try again.');
     } finally {
       setLoading(false);
     }
   };
-
+  
+  // Setup WebSocket
   const setupWebSocket = async () => {
     try {
+      console.log('Setting up WebSocket...');
+      
       const userStr = await AsyncStorage.getItem('user');
-      const user = JSON.parse(userStr);
-
-      if (!user || !user.busId || !user._id) {
-        console.error('❌ User information not found');
-        Alert.alert('Error', 'User information not found');
+      if (!userStr) {
+        Alert.alert('Error', 'User information not found. Please login again.');
         return;
       }
-
-      console.log('🔌 Connecting to WebSocket...');
-      console.log('🚌 Bus ID:', user.busId);
-      console.log('👤 Student ID:', user._id);
-
-      // Join the bus room
-      joinBusRoom(user.busId, user._id);
+      
+      const user = JSON.parse(userStr);
+      const routeNumber = user.routeNumber;
+      const userId = user._id;
+      
+      console.log('Joining bus room for Route:', routeNumber);
+      
+      joinBusRoom(routeNumber, userId);
+      setIsSocketConnected(true);
 
       // Listen for location updates
       listenToLocationUpdates((data) => {
-        console.log('📍 Location update received:', data);
+        console.log('Location update received:', data);
+        
+        if (!data || !data.latitude || !data.longitude) {
+          return;
+        }
         
         const newLocation = {
-          latitude: data.latitude,
-          longitude: data.longitude,
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
         };
-        
+
         setBusLocation(newLocation);
-        
-        // Animate map to new location
-        if (mapRef.current) {
-          mapRef.current.animateToRegion({
-            ...newLocation,
-            latitudeDelta: 0.01,
-            longitudeDelta: 0.01,
-          }, 1000);
+
+        // Smooth animation
+        if (busAnimatedCoord.current) {
+          busAnimatedCoord.current.timing({
+            latitude: newLocation.latitude,
+            longitude: newLocation.longitude,
+            duration: 1000,
+            useNativeDriver: false,
+          }).start();
         }
       });
 
       // Listen for trip completion
       listenToBusReached(() => {
-        console.log('🏁 Bus reached destination');
-        
         Alert.alert(
           'Trip Completed',
           'The bus has reached its destination!',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setTripStatus('REACHED');
-                setStatusMessage('The trip for today has ended.');
-                disconnectSocket();
-              },
+          [{
+            text: 'OK',
+            onPress: () => {
+              setTripStatus('REACHED');
+              setStatusMessage('The trip for today has ended.');
+              setIsSocketConnected(false);
+              disconnectSocket();
             },
-          ]
+          }]
         );
       });
 
-      console.log('✅ WebSocket setup complete');
+      console.log('WebSocket setup complete');
     } catch (error) {
-      console.error('❌ WebSocket setup error:', error);
+      console.error('WebSocket setup error:', error);
+      Alert.alert('Connection Error', 'Failed to connect to live tracking.');
     }
   };
+  
+  // Update ETA when locations change
+  useEffect(() => {
+    if (busLocation && studentLocation && tripStatus === 'ON_ROUTE') {
+      fetchETA(busLocation, studentLocation);
+      
+      // Update ETA every 30 seconds
+      const interval = setInterval(() => {
+        fetchETA(busLocation, studentLocation);
+      }, 30000);
+      
+      return () => clearInterval(interval);
+    } else {
+      setEtaText(null);
+      setDistanceText(null);
+    }
+  }, [busLocation, studentLocation, tripStatus]);
+  
+  // Initialize
+  useEffect(() => {
+    const init = async () => {
+      await Promise.all([
+        getStudentLocation(),
+        fetchRouteData(),
+        checkTripStatus(),
+      ]);
+    };
 
-  // Show loading state
-  if (loading) {
+    init();
+
+    // Cleanup
+    return () => {
+      if (isSocketConnected) {
+        disconnectSocket();
+      }
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+      }
+    };
+  }, []);
+  
+  const polylineCoords = routeData?.stops?.map(stop => ({
+    latitude: stop.lat,
+    longitude: stop.lng,
+  })) || [];
+  
+  const initialRegion = routeData?.stops?.[0] ? {
+    latitude: routeData.stops[0].lat,
+    longitude: routeData.stops[0].lng,
+    latitudeDelta: 0.15,
+    longitudeDelta: 0.15,
+  } : {
+    latitude: 13.1007,
+    longitude: 77.5963,
+    latitudeDelta: 0.15,
+    longitudeDelta: 0.15,
+  };
+
+  // Loading state
+  if (loading || routeLoading) {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#E3F2FD" />
-        
-        {/* Header */}
-        <View style={styles.headerContainer}>
+        <View style={[styles.headerContainer, { paddingTop: (insets.top || 16) + 10 }]}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Image
-                source={require('../assets/images/BackButton.png')}
-                style={styles.backImage}
-                resizeMode="contain"
-              />
+              <View style={styles.backIconWrapper}>
+                <Ionicons name="chevron-back" size={22} color="#111827" />
+              </View>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{routeData.routeName}</Text>
+            <Text style={styles.headerTitle}>{routeData?.routeName || 'Loading...'}</Text>
             <View style={styles.rightPlaceholder} />
           </View>
         </View>
-
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2981f3ff" />
-          <Text style={styles.loadingText}>Checking bus status...</Text>
+          <Text style={styles.loadingText}>
+            {routeLoading ? 'Loading route...' : 'Checking bus status...'}
+          </Text>
         </View>
       </View>
     );
   }
 
-  // Show "Trip Not Started" message
+  // Trip not started
   if (tripStatus === 'NOT_STARTED' || tripStatus === 'REACHED') {
     return (
       <View style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor="#E3F2FD" />
-        
-        {/* Header */}
-        <View style={styles.headerContainer}>
+        <View style={[styles.headerContainer, { paddingTop: (insets.top || 16) + 10 }]}>
           <View style={styles.headerContent}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Image
-                source={require('../assets/images/BackButton.png')}
-                style={styles.backImage}
-                resizeMode="contain"
-              />
+              <View style={styles.backIconWrapper}>
+                <Ionicons name="chevron-back" size={22} color="#111827" />
+              </View>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>{routeData.routeName}</Text>
+            <Text style={styles.headerTitle}>{routeData?.routeName || 'Route'}</Text>
             <View style={styles.rightPlaceholder} />
           </View>
         </View>
-
         <View style={styles.messageContainer}>
           <Text style={styles.messageIcon}>🚌</Text>
           <Text style={styles.messageText}>{statusMessage}</Text>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={checkTripStatus}
-          >
+          <TouchableOpacity style={styles.refreshButton} onPress={checkTripStatus}>
             <Text style={styles.refreshButtonText}>Refresh</Text>
           </TouchableOpacity>
         </View>
@@ -270,37 +530,36 @@ export default function Map() {
     );
   }
 
+  // Main map view
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#E3F2FD" />
       
-      {/* Map - Full Screen */}
       <MapView
         ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
+        showsUserLocation={false}
+        showsMyLocationButton={false}
+        provider={MapView.PROVIDER_GOOGLE}
       >
-        {/* Route Polyline */}
+        {/* Route polyline */}
         <Polyline
           coordinates={polylineCoords}
           strokeColor="#2981f3ff"
           strokeWidth={4}
         />
         
-        {/* Custom Bus Stop Markers */}
-        {routeData.stops.map((stop, index) => {
+        {/* Stop markers */}
+        {routeData?.stops?.map((stop, index) => {
           const isFirst = index === 0;
           const isLast = index === routeData.stops.length - 1;
           
           return (
             <Marker
               key={stop.id}
-              coordinate={{
-                latitude: stop.lat,
-                longitude: stop.lng,
-              }}
+              coordinate={{ latitude: stop.lat, longitude: stop.lng }}
               anchor={{ x: 0.5, y: 0.5 }}
-              centerOffset={{ x: 0, y: 0 }}
             >
               <View style={[
                 styles.customMarker,
@@ -314,104 +573,82 @@ export default function Map() {
           );
         })}
 
-        {/* Live Bus Marker */}
-        {busLocation && (
-          <Marker
-            coordinate={busLocation}
+        {/* Bus marker */}
+        {busLocation && busAnimatedCoord.current && (
+          <Marker.Animated
+            coordinate={busAnimatedCoord.current}
             anchor={{ x: 0.5, y: 0.5 }}
-            title="Live Bus Location"
+            title="Bus"
+            description="Live Location"
           >
             <View style={styles.busMarker}>
-              <Text style={styles.busIcon}>🚌</Text>
+              <Ionicons name="bus" size={24} color="#fff" />
             </View>
-          </Marker>
+          </Marker.Animated>
+        )}
+
+        {/* Student marker */}
+        {studentLocation && studentAnimatedCoord.current && (
+          <Marker.Animated
+            coordinate={studentAnimatedCoord.current}
+            anchor={{ x: 0.5, y: 1 }}
+            title="You"
+          >
+            <View style={styles.studentMarkerContainer}>
+              <View style={styles.studentPulseOuter}>
+                <View style={styles.studentPulseInner} />
+              </View>
+            </View>
+          </Marker.Animated>
         )}
       </MapView>
 
-      {/* Header - Overlay on Map */}
-      <View style={styles.headerContainer}>
+      {/* Header */}
+      <View style={[styles.headerContainer, { paddingTop: (insets.top || 16) + 10 }]}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Image
-              source={require('../assets/images/BackButton.png')}
-              style={styles.backImage}
-              resizeMode="contain"
-            />
+            <View style={styles.backIconWrapper}>
+              <Ionicons name="chevron-back" size={22} color="#111827" />
+            </View>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{routeData.routeName}</Text>
+          <Text style={styles.headerTitle}>{routeData?.routeName || 'Route'}</Text>
           <View style={styles.rightPlaceholder} />
         </View>
       </View>
 
-      {/* Live Status Indicator */}
-      {tripStatus === 'ON_ROUTE' && (
-        <View style={styles.liveIndicator}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>Live Tracking</Text>
-        </View>
-      )}
-
-      {/* List View Overlay */}
-      {viewMode === 'list' && (
-        <View style={styles.listOverlay}>
-          <ScrollView style={styles.listContainer}>
-            {routeData.stops.map((stop, index) => (
-              <View key={stop.id} style={styles.stopItem}>
-                <View style={styles.stopIndicator}>
-                  <View style={[
-                    styles.stopDot,
-                    index === 0 && styles.startDot,
-                    index === routeData.stops.length - 1 && styles.endDot
-                  ]} />
-                  {index < routeData.stops.length - 1 && (
-                    <View style={styles.stopLine} />
-                  )}
-                </View>
-                <View style={styles.stopDetails}>
-                  <Text style={styles.stopName}>{stop.name}</Text>
-                  <Text style={styles.stopTime}>{stop.time}</Text>
-                  {index === 0 && <Text style={styles.stopLabel}>Source</Text>}
-                  {index === routeData.stops.length - 1 && <Text style={styles.stopLabel}>Destination</Text>}
-                </View>
+      {/* ETA Card */}
+      {tripStatus === 'ON_ROUTE' && etaText && (
+        <View style={styles.etaCard}>
+          <View style={styles.etaHeader}>
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          </View>
+          <View style={styles.etaContent}>
+            <View style={styles.etaItem}>
+              <Text style={styles.etaLabel}>Estimated Arrival</Text>
+              <Text style={styles.etaValue}>{etaText}</Text>
+            </View>
+            {distanceText && (
+              <View style={styles.etaDivider} />
+            )}
+            {distanceText && (
+              <View style={styles.etaItem}>
+                <Text style={styles.etaLabel}>Distance</Text>
+                <Text style={styles.etaValue}>{distanceText}</Text>
               </View>
-            ))}
-          </ScrollView>
+            )}
+          </View>
         </View>
       )}
-
-      {/* Toggle Buttons - Overlay on Map */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleButton, viewMode === 'list' && styles.activeToggle]}
-          onPress={() => setViewMode('list')}
-        >
-          <Text style={[styles.toggleText, viewMode === 'list' && styles.activeToggleText]}>
-            list
-          </Text>
-        </TouchableOpacity>
-        
-        <View style={styles.divider} />
-        
-        <TouchableOpacity
-          style={[styles.toggleButton, viewMode === 'map' && styles.activeToggle]}
-          onPress={() => setViewMode('map')}
-        >
-          <Text style={[styles.toggleText, viewMode === 'map' && styles.activeToggleText]}>
-            Map
-          </Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    ...StyleSheet.absoluteFillObject,
-  },
+  container: { flex: 1 },
+  map: { ...StyleSheet.absoluteFillObject },
   headerContainer: {
     position: 'absolute',
     top: 0,
@@ -421,18 +658,12 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     zIndex: 100,
-    paddingTop: StatusBar.currentHeight || 40,
     paddingBottom: 10,
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-  },
-  backImage: {
-    width: 24,
-    height: 24,
-    tintColor: '#2C2C2C',
   },
   headerContent: {
     flexDirection: 'row',
@@ -446,14 +677,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  backIconWrapper: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#2C2C2C',
   },
-  rightPlaceholder: {
-    width: 40,
-  },
+  rightPlaceholder: { width: 40 },
   customMarker: {
     width: 14,
     height: 14,
@@ -463,176 +705,116 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  startMarker: {
-    backgroundColor: '#4CAF50',
-  },
-  endMarker: {
-    backgroundColor: '#F44336',
-  },
-  middleMarker: {
-    backgroundColor: '#E53935',
-  },
+  startMarker: { backgroundColor: '#4CAF50' },
+  endMarker: { backgroundColor: '#F44336' },
+  middleMarker: { backgroundColor: '#2981f3ff' },
   innerCircle: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#fff',
   },
-  // Bus Marker Styles
   busMarker: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 8,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#2981f3ff',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 3,
-    borderColor: '#2981f3ff',
+    borderColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
   },
-  busIcon: {
-    fontSize: 24,
-  },
-  // Live Indicator
-  liveIndicator: {
-    position: 'absolute',
-    top: StatusBar.currentHeight + 70 || 110,
-    right: 20,
-    flexDirection: 'row',
+  studentMarkerContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
-    marginRight: 6,
-  },
-  liveText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  listOverlay: {
-    position: 'absolute',
-    top: 80,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  listContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  stopItem: {
-    flexDirection: 'row',
-    marginBottom: 5,
-  },
-  stopIndicator: {
+  studentPulseOuter: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(29, 78, 216, 0.18)',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
   },
-  stopDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#E53935',
-    zIndex: 1,
+  studentPulseInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#2563eb',
+    borderWidth: 3,
+    borderColor: '#fff',
   },
-  startDot: {
-    backgroundColor: '#4CAF50',
-  },
-  endDot: {
-    backgroundColor: '#F44336',
-  },
-  stopLine: {
-    width: 3,
-    flex: 1,
-    backgroundColor: '#FFB300',
-    marginTop: -2,
-    minHeight: 40,
-  },
-  stopDetails: {
-    flex: 1,
-    paddingBottom: 20,
-  },
-  stopName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C2C2C',
-    marginBottom: 4,
-  },
-  stopTime: {
-    fontSize: 14,
-    color: '#757575',
-    marginBottom: 4,
-  },
-  stopLabel: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  toggleContainer: {
+  etaCard: {
     position: 'absolute',
     bottom: 30,
-    left: 80,
-    right: 80,
-    flexDirection: 'row',
+    left: 20,
+    right: 20,
     backgroundColor: '#fff',
-    borderRadius: 30,
-    padding: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 16,
+    padding: 16,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
+  etaHeader: {
+    marginBottom: 12,
+  },
+  liveIndicator: {
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 25,
+    alignSelf: 'flex-start',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  activeToggle: {
-    backgroundColor: '#E3F2FD',
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+    marginRight: 6,
   },
-  toggleText: {
-    fontSize: 16,
+  liveText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  etaContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  etaItem: {
+    flex: 1,
+  },
+  etaDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 12,
+  },
+  etaLabel: {
+    fontSize: 12,
     color: '#757575',
+    marginBottom: 4,
     fontWeight: '500',
   },
-  activeToggleText: {
-    color: '#2C2C2C',
-    fontWeight: '600',
+  etaValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#2981f3ff',
   },
-  divider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#E0E0E0',
-  },
-  // Loading State
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -644,7 +826,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#757575',
   },
-  // Message State
   messageContainer: {
     flex: 1,
     justifyContent: 'center',

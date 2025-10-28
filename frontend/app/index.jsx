@@ -23,8 +23,6 @@ export default function SplashScreen() {
     const checkAuth = async () => {
       if (authCheckDone.current) return;
       authCheckDone.current = true;
-      console.log('🔍 Starting auth check...');
-      
       try {
         const token = await AsyncStorage.getItem('authToken');
         const userRole = await AsyncStorage.getItem('userRole');

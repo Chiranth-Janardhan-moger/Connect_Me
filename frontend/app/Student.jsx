@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 
 const { width } = Dimensions.get('window');
 
@@ -28,7 +29,7 @@ const Home = () => {
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   const cardAnims = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
@@ -39,31 +40,38 @@ const Home = () => {
 
   useEffect(() => {
     fetchUserData();
+    // Request (but do not start tracking) permission at student home
+    (async () => {
+      try {
+        await Location.requestForegroundPermissionsAsync();
+      } catch {}
+    })();
     
     // Entrance animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 800,
+        duration: 600,
         useNativeDriver: true,
       }),
     ]).start();
 
     // Staggered card animations
     cardAnims.forEach((anim, index) => {
-      Animated.timing(anim, {
+      Animated.spring(anim, {
         toValue: 1,
-        duration: 600,
-        delay: 200 + index * 100,
+        speed: 10,
+        bounciness: 6,
+        delay: 80 + index * 80,
         useNativeDriver: true,
       }).start();
     });
-  });
+  }, []);
 
   useEffect(() => {
     if (showProfileModal) {
@@ -245,21 +253,18 @@ const Home = () => {
             ]}
           >
             <LinearGradient
-              colors={['#2C3E50', '#34495E']}
+              colors={['#0ea5e9', '#2563eb']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.headerGradient}
             >
-              {/* Decorative Circles */}
-              <View style={styles.circleTopLeft} />
-              <View style={styles.circleBottomRight} />
-              <View style={styles.circleBottomLeft} />
+              {/* Subtle translucent blobs instead of circles */}
+              <View style={styles.blobOne} />
+              <View style={styles.blobTwo} />
               
               <View style={styles.headerContent}>
                 <View style={styles.headerTextContainer}>
-                  <Text style={styles.instituteName}>
-                    BMS Institute of Technology
-                  </Text>
+                  <Text style={styles.instituteName}>BMS Institute of Technology and Management</Text>
                   <Text style={styles.userName}>{userName}</Text>
                 </View>
 
@@ -270,7 +275,7 @@ const Home = () => {
                   style={styles.avatarContainer}
                 >
                   <LinearGradient
-                    colors={['#4ECDC4', '#44A08D']}
+                    colors={['#22c55e', '#16a34a']}
                     style={styles.avatarGradient}
                   >
                     <Text style={styles.avatarText}>
@@ -289,7 +294,7 @@ const Home = () => {
               animValue={cardAnims[0]}
               onPress={handleBusPress}
               style={styles.menuItem}
-              colors={['#E8F5E9', '#C8E6C9']}
+              colors={['#e0f2fe', '#bae6fd']}
             >
               <Image
                 source={require('../assets/images/Bus_icon.png')}
@@ -303,7 +308,7 @@ const Home = () => {
               animValue={cardAnims[1]}
               onPress={handleContactsPress}
               style={styles.menuItem}
-              colors={['#E3F2FD', '#BBDEFB']}
+              colors={['#e5e7eb', '#f3f4f6']}
             >
               <Image
                 source={require('../assets/images/Chat.png')}
@@ -317,7 +322,7 @@ const Home = () => {
               animValue={cardAnims[2]}
               onPress={handleSOSPress}
               style={styles.menuItem}
-              colors={['#FFEBEE', '#FFCDD2']}
+              colors={['#fee2e2', '#fecaca']}
             >
               <Image
                 source={require('../assets/images/sos.png')}
@@ -331,7 +336,7 @@ const Home = () => {
               animValue={cardAnims[3]}
               onPress={handleInfoPress}
               style={styles.menuItem}
-              colors={['#FFF8E1', '#FFECB3']}
+              colors={['#fff7ed', '#ffedd5']}
             >
               <Image
                 source={require('../assets/images/Information.png')}
@@ -425,85 +430,80 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 60,
+    paddingTop: 40,
     paddingHorizontal: 20,
   },
   headerCard: {
-    marginBottom: 30,
-    borderRadius: 30,
+    marginBottom: 24,
+    borderRadius: 24,
     overflow: 'hidden',
-    height: 180,
+    height: 160,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 5,
   },
   headerGradient: {
     flex: 1,
     position: 'relative',
   },
-  circleTopLeft: {
+  blobOne: {
     position: 'absolute',
-    top: -50,
-    left: -30,
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: 'rgba(52, 152, 219, 0.3)',
-    borderWidth: 3,
-    borderColor: '#3498DB',
+    top: -10,
+    right: -30,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  circleBottomLeft: {
+  blobTwo: {
     position: 'absolute',
-    bottom: -20,
-    left: 40,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(52, 152, 219, 0.15)',
+    bottom: -10,
+    left: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
   headerContent: {
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
     zIndex: 1,
   },
   headerTextContainer: {
     flex: 1,
   },
   instituteName: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 8,
+    color: '#E0E7FF',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
     letterSpacing: 0.3,
   },
   userName: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
   avatarContainer: {
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
     shadowRadius: 4,
     elevation: 4,
   },
   avatarGradient: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 3,
     borderColor: '#FFFFFF',
     justifyContent: 'center',
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: '#FFFFFF',
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
   },
   menuGrid: {
@@ -520,42 +520,42 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   menuItem: {
-    width: (width - 60) / 2,
-    marginBottom: 20,
+    width: (width - 56) / 2,
+    marginBottom: 16,
   },
   menuImage: {
-    width: 100,
-    height: 100,
+    width: 92,
+    height: 92,
     alignSelf: 'center',
     marginBottom: 8,
     resizeMode: 'contain',
   },
   menuTitle: {
-    color: '#1F2937',
-    fontSize: 18,
+    color: '#111827',
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
+    textAlign: 'center',
   },
   bottomSpace: {
-    height: 20,
+    height: 16,
   },
   cardWrapper: {
-    borderRadius: 24,
+    borderRadius: 20,
     backgroundColor: '#fff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 6,
   },
   touchableFix: {
-    borderRadius: 24,
+    borderRadius: 20,
     overflow: 'hidden',
   },
   cardContent: {
-    borderRadius: 24,
-    padding: 20,
-    minHeight: 180,
+    borderRadius: 20,
+    padding: 16,
+    minHeight: 160,
     justifyContent: 'space-between',
   },
   // Modal Styles

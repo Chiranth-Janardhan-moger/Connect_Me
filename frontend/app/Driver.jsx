@@ -16,7 +16,7 @@ import { driverAPI } from '../src/config/api';
 import {
   connectDriverSocket,
   emitDriverLocation,
-  disconnectSocket,
+  disconnectSocket
 } from '../src/config/socket';
 
 export default function DriverDashboard() {
@@ -356,22 +356,22 @@ export default function DriverDashboard() {
                 • Ensure your GPS is turned on
               </Text>
               <Text style={styles.instructionItem}>
-                 {`• Click "End Trip" when you reach the destination`}
+                {`• Click "End Trip" when you reach the destination`}
               </Text>
             </>
           ) : (
             <>
               <Text style={styles.instructionItem}>
-               {`• Click "Start Trip" to begin your journey`}
+                {`• Click "Start Trip" to begin your journey`}
               </Text>
               <Text style={styles.instructionItem}>
-                • Make sure location permissions are enabled
+                {`• Make sure location permissions are enabled`}
               </Text>
               <Text style={styles.instructionItem}>
-                • Your location will be shared with students in real-time
+                {`• Your location will be shared with students in real-time`}
               </Text>
               <Text style={styles.instructionItem}>
-                • Keep your device charged during the trip
+                {`• Keep your device charged during the trip`}
               </Text>
             </>
           )}

@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Base URL - Change this once for the entire app
-export const API_BASE_URL = 'http://192.168.1.102:4000'; // or 'http://192.168.1.100:3000' for local
-
+export const API_BASE_URL = 'http://192.168.1.103:4000'; // or 'http://192.168.1.100:3000' for local
+// https://connect-me-8hc8.onrender.com
 export const SOCKET_URL = API_BASE_URL; // Socket.io uses same base URL
 
 export const API_ENDPOINTS = {
@@ -12,10 +12,15 @@ export const API_ENDPOINTS = {
   
   // Student
   STUDENT_LIVE_LOCATION: '/api/student/live-location',
+  STUDENT_ROUTE_INFO: '/api/student/route-info',
   
   // Driver
   DRIVER_START_TRIP: '/api/driver/start-trip',
   DRIVER_END_TRIP: '/api/driver/end-trip',
+  
+  // Admin
+  ADMIN_ROUTES: '/api/admin/routes',
+  ADMIN_USERS: '/api/admin/users', // expects optional ?role=student|driver
 };
 
 export const apiCall = async (endpoint, options = {}) => {
@@ -86,6 +91,12 @@ export const studentAPI = {
       method: 'GET',
     });
   },
+  
+  getRouteInfo: async () => {
+    return await apiCall(API_ENDPOINTS.STUDENT_ROUTE_INFO, {
+      method: 'GET',
+    });
+  },
 };
 
 // Driver APIs
@@ -99,6 +110,24 @@ export const driverAPI = {
   endTrip: async () => {
     return await apiCall(API_ENDPOINTS.DRIVER_END_TRIP, {
       method: 'POST',
+    });
+  },
+};
+
+// Admin APIs
+export const adminAPI = {
+  getRoutes: async () => {
+    return await apiCall(API_ENDPOINTS.ADMIN_ROUTES, {
+      method: 'GET',
+    });
+  },
+  getUsers: async (role) => {
+    const endpoint = role ? `${API_ENDPOINTS.ADMIN_USERS}?role=${encodeURIComponent(role)}` : API_ENDPOINTS.ADMIN_USERS;
+    return await apiCall(endpoint, { method: 'GET' });
+  },
+  deleteUser: async (userId) => {
+    return await apiCall(`${API_ENDPOINTS.ADMIN_USERS}/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
     });
   },
 };

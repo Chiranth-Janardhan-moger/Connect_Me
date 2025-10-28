@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API Base URL - Change this once for the entire app
-export const API_BASE_URL = 'http://192.168.1.103:4000'; // or 'http://192.168.1.100:3000' for local
-// https://connect-me-8hc8.onrender.com
+export const API_BASE_URL = 'https://connect-me-8hc8.onrender.com'; // or 'http://192.168.1.100:3000' for local
+// 
 export const SOCKET_URL = API_BASE_URL; // Socket.io uses same base URL
 
 export const API_ENDPOINTS = {

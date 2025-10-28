@@ -121,6 +121,14 @@ class AdminService {
     async getAllRoutes(): Promise<IRoute[]> {
         return routeRepository.findAll();
     }
+
+    async getUsersByRole(role?: string): Promise<IUser[]> {
+        return userRepository.findAllByRole(role);
+    }
+
+    async deleteUser(userId: string): Promise<IUser | null> {
+        return userRepository.deleteById(userId);
+    }
 }
 
 export default new AdminService();

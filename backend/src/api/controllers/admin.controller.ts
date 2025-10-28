@@ -60,3 +60,34 @@ export const getAllRoutes = async (req: Request, res: Response) => {
         handleServiceError(error, res);
     }
 };
+
+export const getUsers = async (req: Request, res: Response) => {
+    try {
+        const roleParam = typeof req.query.role === 'string' ? req.query.role : undefined;
+        const users = await adminService.getUsersByRole(roleParam);
+        const sanitized = users.map((u) => {
+            const obj: any = u.toObject();
+            delete obj.passwordHash;
+            return obj;
+        });
+        res.status(200).json({ users: sanitized });
+    } catch (error) {
+        handleServiceError(error, res);
+    }
+};
+
+export const deleteUser = async (req: Request, res: Response) => {
+    try {
+        const { userId } = req.params as { userId: string };
+        if (!userId) {
+            return res.status(400).json({ message: 'userId is required.' });
+        }
+        const deleted = await adminService.deleteUser(userId);
+        if (!deleted) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        res.status(200).json({ message: 'User deleted successfully.' });
+    } catch (error) {
+        handleServiceError(error, res);
+    }
+};

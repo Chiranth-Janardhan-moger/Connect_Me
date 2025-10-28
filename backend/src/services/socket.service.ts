@@ -21,17 +21,22 @@ export const initializeSocket = (httpServer: HttpServer) => {
         socket.on('student:join', async ({ busId, studentId }) => {
             if (!busId) return;
             console.log(`Student ${studentId} joining room for bus ${busId}`);
-            socket.join(busId);
+            socket.join(busId.toString()); // Convert to string for room name
 
             // Send the last known location to the student upon joining
             try {
-                const bus = await busRepository.findById(busId);
+                // FIX: Search by busNumber or routeNumber instead of _id
+                // Since busId is being sent as routeNumber (1, 2, 3, etc.)
+                const bus = await busRepository.findByRouteNumber(busId);
+                
                 if (bus && bus.currentLat && bus.currentLon) {
                     socket.emit('student:location-update', {
                         latitude: bus.currentLat,
                         longitude: bus.currentLon,
                         timestamp: bus.lastUpdated,
                     });
+                } else {
+                    console.log(`No active location found for route ${busId}`);
                 }
             } catch (error) {
                 console.error("Error fetching last known location:", error);
@@ -43,7 +48,9 @@ export const initializeSocket = (httpServer: HttpServer) => {
             if (!busId || latitude === undefined || longitude === undefined) return;
             
             try {
-                const bus = await busRepository.findById(busId);
+                // FIX: Find by routeNumber instead of _id
+                const bus = await busRepository.findByRouteNumber(busId);
+                
                 if (!bus || bus.tripStatus !== TripStatus.ON_ROUTE) {
                     // If trip ended, notify driver to stop sending updates
                     if(bus && bus.tripStatus === TripStatus.REACHED) {
@@ -59,14 +66,13 @@ export const initializeSocket = (httpServer: HttpServer) => {
                 bus.locationHistory.push({ lat: latitude, lon: longitude, timestamp: now });
                 
                 // Broadcast update to all students in the room
-                io.to(busId).emit('student:location-update', {
+                io.to(busId.toString()).emit('student:location-update', {
                     latitude,
                     longitude,
                     timestamp: now,
                 });
                 
                 // Check if bus has reached destination
-                // We need to fetch the route by routeNumber since we changed the model
                 const route = await busRepository.findRouteByNumber(bus.routeNumber);
                 if (route && route.stops && route.stops.length > 0) {
                     const lastStop = route.stops[route.stops.length - 1];
@@ -74,7 +80,7 @@ export const initializeSocket = (httpServer: HttpServer) => {
 
                     if (distance <= DESTINATION_RADIUS_METERS) {
                         bus.tripStatus = TripStatus.REACHED;
-                        io.to(busId).emit('bus:reached', {
+                        io.to(busId.toString()).emit('bus:reached', {
                             busId: bus._id,
                             status: TripStatus.REACHED,
                             message: `Bus has reached the destination: ${lastStop.label}.`

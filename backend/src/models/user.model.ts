@@ -16,6 +16,7 @@ export interface IUser extends MongooseDocument {
     role: UserRole;
     busId?: Types.ObjectId; // busId is optional for admin
     routeNumber?: number; // route number for students
+    expoPushToken?: string;
     comparePassword(password: string): Promise<boolean>;
 }
 
@@ -47,7 +48,8 @@ const UserSchema: Schema = new Schema({
             // Required only if the role is student
             return this.role === UserRole.STUDENT;
         }
-    }
+    },
+    expoPushToken: { type: String }
 } as any);
 
 UserSchema.pre<IUser>('save', async function (next) {

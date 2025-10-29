@@ -123,7 +123,24 @@ class AdminService {
     }
 
     async getUsersByRole(role?: string): Promise<IUser[]> {
-        return userRepository.findAllByRole(role);
+        const users = await userRepository.findAllByRole(role);
+        // Augment drivers with routeNumber from their assigned bus
+        const augmented = await Promise.all(users.map(async (u: any) => {
+            if (u.role === UserRole.DRIVER && !u.routeNumber) {
+                try {
+                    const bus = await busRepository.findByDriverId(String(u._id));
+                    if (bus) {
+                        // Attach transiently for response
+                        u = u.toObject ? u.toObject() : u;
+                        u.routeNumber = bus.routeNumber;
+                        return u as IUser;
+                    }
+                } catch (_) {}
+            }
+            return u;
+        }));
+        // @ts-ignore - return as IUser[]
+        return augmented as any;
     }
 
     async deleteUser(userId: string): Promise<IUser | null> {

@@ -6,14 +6,19 @@ import authRoutes from './api/routes/auth.routes';
 import driverRoutes from './api/routes/driver.routes';
 import studentRoutes from './api/routes/student.routes';
 import adminRoutes from './api/routes/admin.routes';
+import notificationRoutes from './api/routes/notification.routes';
 
 const app: Application = express();
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:19006', 'http://localhost:19002', 'exp://192.168.1.102:19000'],
-  credentials: true
+  origin: true, // Allow all origins (adjust for production)
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+// Handle preflight requests quickly
+app.options('*', cors());
 app.use(express.json());
 
 // API Routes
@@ -24,6 +29,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 
 export default app;

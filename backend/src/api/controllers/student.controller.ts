@@ -22,25 +22,39 @@ export const getLiveLocation = async (req: Request, res: Response) => {
             });
         }
 
-        // Location not available yet - return 200 with flag (NO ERROR)
-        if (!bus.currentLat || !bus.currentLon) {
+        // Check if location is available and trip is ON_ROUTE
+        const hasValidLocation = bus.currentLat !== undefined && bus.currentLon !== undefined && bus.currentLat !== null && bus.currentLon !== null;
+        const isOnRoute = bus.tripStatus === 'ON_ROUTE';
+
+        if (!hasValidLocation || !isOnRoute) {
             return res.status(200).json({
                 busId: bus._id,
                 status: bus.tripStatus,
                 locationAvailable: false,
-                message: "Bus location not available yet.",
+                message: isOnRoute ? "Bus location not available yet." : "Trip not started.",
                 location: null
             });
         }
 
-        // Location available - return full data
+        // Validate coordinates are valid numbers
+        const latitude = Number(bus.currentLat);
+        const longitude = Number(bus.currentLon);
+        
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+            console.error('Invalid coordinates in database:', { lat: bus.currentLat, lng: bus.currentLon });
+            return res.status(500).json({ 
+                message: 'Server error: Invalid coordinates stored' 
+            });
+        }
+
+        // Location available - return full data with validated numbers
         return res.status(200).json({
             busId: bus._id,
             status: bus.tripStatus,
             locationAvailable: true,
             location: {
-                latitude: bus.currentLat,
-                longitude: bus.currentLon,
+                latitude,
+                longitude,
                 lastUpdated: bus.lastUpdated,
             },
         });

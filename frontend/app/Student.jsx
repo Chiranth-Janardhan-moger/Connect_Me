@@ -17,6 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import ErrorModal from '../src/components/ErrorModal';
+import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import { preloadMapData } from '../src/services/mapPreload';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +28,9 @@ const Home = () => {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [userEmail, setUserEmail] = useState('');
   const [userRole, setUserRole] = useState('');
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const router = useRouter();
   
   // Animation values
@@ -40,6 +46,8 @@ const Home = () => {
 
   useEffect(() => {
     fetchUserData();
+    // Preload map data in background for faster map open
+    preloadMapData().catch(() => {});
     // Request (but do not start tracking) permission at student home
     (async () => {
       try {
@@ -150,7 +158,9 @@ const Home = () => {
               router.replace('/Login');
             } catch (error) {
               console.error('❌ Logout error:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
+              setErrorTitle('Error');
+              setErrorMessage('Failed to logout. Please try again.');
+              setErrorModalVisible(true);
             }
           },
         },
@@ -236,10 +246,18 @@ const Home = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
+      {/* Hidden MapView to warm up Google renderer */}
+      <MapView
+        provider={PROVIDER_GOOGLE}
+        style={{ position: 'absolute', width: 1, height: 1, left: -1000, top: -1000 }}
+        initialRegion={{ latitude: 12.9716, longitude: 77.5946, latitudeDelta: 0.15, longitudeDelta: 0.15 }}
+        pointerEvents="none"
+      />
       
       <View style={styles.backgroundGradient}>
         <ScrollView
           showsVerticalScrollIndicator={false}
+          decelerationRate="fast"
           contentContainerStyle={styles.scrollContent}
         >
           {/* Header Card */}
@@ -417,6 +435,13 @@ const Home = () => {
           </Animated.View>
         </TouchableOpacity>
       </Modal>
+      
+      <ErrorModal
+        visible={errorModalVisible}
+        title={errorTitle}
+        message={errorMessage}
+        onClose={() => setErrorModalVisible(false)}
+      />
     </View>
   );
 };

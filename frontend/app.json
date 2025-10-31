@@ -50,7 +50,13 @@
           }
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsDownloadToken": "NOT_REQUIRED_FOR_OSM"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

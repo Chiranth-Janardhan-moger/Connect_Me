@@ -7,7 +7,6 @@ import {
   StyleSheet,
   StatusBar,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,18 +16,31 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../src/config/api';  // Import API
 import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
+import ErrorModal from '../src/components/ErrorModal';
+import { preloadMapData } from '../src/services/mapPreload';
 
 export default function LoginScreen() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
+  };
+
+  const showErrorModal = (title, message) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setErrorModalVisible(true);
   };
 
   const handleLogin = async () => {
@@ -73,7 +85,12 @@ export default function LoginScreen() {
             // Ask for location permission up-front (no watchers started here)
             try {
               await Location.requestForegroundPermissionsAsync();
-            } catch {}
+              // Start map data preloading in background
+              preloadMapData().catch(() => {});
+            } catch {
+              // Still try to preload best-effort
+              preloadMapData().catch(() => {});
+            }
             router.replace('/Student');
             break;
           case 'driver':
@@ -83,30 +100,30 @@ export default function LoginScreen() {
             router.replace('/Admin');
             break;
           default:
-            Alert.alert('Error', 'Invalid user role');
+            showErrorModal('Error', 'Invalid user role');
         }
       } else {
-        let errorMessage = 'An error occurred. Please try again.';
+        let errorMsg = 'An error occurred. Please try again.';
 
         switch (response.status) {
           case 401:
-            errorMessage = 'Invalid email or password.';
+            errorMsg = 'Invalid email or password.';
             break;
           case 404:
-            errorMessage = 'User not found. Please contact admin.';
+            errorMsg = 'User not found. Please contact admin.';
             break;
           case 500:
-            errorMessage = 'Server error. Please try again later.';
+            errorMsg = 'Server error. Please try again later.';
             break;
           default:
-            errorMessage = response.data.message || errorMessage;
+            errorMsg = response.data.message || errorMsg;
         }
 
-        Alert.alert('Login Failed', errorMessage);
+        showErrorModal('Login Failed', errorMsg);
       }
     } catch (error) {
       console.error('Login error:', error);
-      Alert.alert(
+      showErrorModal(
         'Connection Error',
         'Unable to connect to server. Please check your internet connection.'
       );
@@ -159,20 +176,29 @@ export default function LoginScreen() {
 
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Password</Text>
-              <TextInput
-                style={[styles.input, passwordError ? styles.inputError : null]}
-                placeholder="Enter your password"
-                placeholderTextColor="#9ca3af"
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  setPasswordError('');
-                }}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-              />
+              <View style={{ position: 'relative' }}>
+                <TextInput
+                  style={[styles.input, { paddingRight: 44 }, passwordError ? styles.inputError : null]}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#9ca3af"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    setPasswordError('');
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword((v) => !v)}
+                  style={styles.eyeButton}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={22} color="#6b7280" />
+                </TouchableOpacity>
+              </View>
               {passwordError ? (
                 <Text style={styles.errorText}>{passwordError}</Text>
               ) : null}
@@ -198,6 +224,14 @@ export default function LoginScreen() {
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Custom Error Modal */}
+      <ErrorModal
+        visible={errorModalVisible}
+        title={errorTitle}
+        message={errorMessage}
+        onClose={() => setErrorModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -262,6 +296,15 @@ const styles = StyleSheet.create({
   },
   inputError: {
     borderColor: '#ef4444',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    height: 24,
+    width: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorText: {
     color: '#ef4444',

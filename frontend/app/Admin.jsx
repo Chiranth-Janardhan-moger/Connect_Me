@@ -10,6 +10,7 @@ import {
   Modal,
   Dimensions,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 // 1. Import SafeAreaView from the correct package
 import { SafeAreaView } from 'react-native-safe-area-context'; // <-- FIX 1
@@ -21,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Adjust this import path to your apiService.js file
 import { apiCall, authAPI, adminAPI } from '../src/config/api'; 
 import NetInfo from '@react-native-community/netinfo';
+import ErrorModal from '../src/components/ErrorModal';
 
 const { width } = Dimensions.get('window');
 
@@ -72,6 +74,36 @@ export default function AdminDashboard() {
   const [drivers, setDrivers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
+  // Notifications
+  const [notifModalVisible, setNotifModalVisible] = useState(false);
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifBody, setNotifBody] = useState('');
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorTitle, setErrorTitle] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const showError = (title, message) => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setErrorModalVisible(true);
+  };
+
+  // Helper to check for token errors and redirect to login
+  const checkTokenError = (response) => {
+    if (response.status === 400 || response.status === 401) {
+      const message = response.data?.message?.toLowerCase() || '';
+      if (message.includes('token') || message.includes('denied') || message.includes('unauthorized')) {
+        Alert.alert(
+          'Session Expired',
+          'Your session has expired. Please login again.',
+          [{ text: 'OK', onPress: () => router.replace('/Login') }]
+        );
+        return true;
+      }
+    }
+    return false;
+  };
+
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       setIsOffline(!(state.isConnected && state.isInternetReachable !== false));
@@ -108,55 +140,64 @@ export default function AdminDashboard() {
   const fetchRoutes = async () => {
     try {
       setLoadingRoutes(true);
-      const { ok, data } = await adminAPI.getRoutes();
-      if (ok) {
-        setAvailableRoutes(data.routes || []);
+      const response = await adminAPI.getRoutes();
+      if (response.ok) {
+        setAvailableRoutes(response.data.routes || []);
       } else {
-        Alert.alert('Error', 'Failed to fetch routes');
+        if (checkTokenError(response)) return;
+        showError('Error', 'Failed to fetch routes');
       }
     } catch (error) {
       console.error('Error fetching routes:', error);
-      Alert.alert('Error', 'Failed to fetch routes');
+      showError('Error', 'Failed to fetch routes');
     } finally {
       setLoadingRoutes(false);
     }
   };
 
-  const fetchUsers = async () => {
-    try {
-      setLoadingUsers(true);
-      const [studentsResp, driversResp] = await Promise.all([
-        adminAPI.getUsers?.('student'),
-        adminAPI.getUsers?.('driver'),
-      ]);
-      if (studentsResp?.ok) setStudents(studentsResp.data.users || []);
-      if (driversResp?.ok) setDrivers(driversResp.data.users || []);
-      if (!studentsResp?.ok && !driversResp?.ok) {
-        Alert.alert('Info', 'User listing API not available.');
-      }
-    } catch (e) {
-      console.error('Error fetching users', e);
-      Alert.alert('Error', 'Failed to fetch users');
-    } finally {
-      setLoadingUsers(false);
+ const fetchUsers = async () => {
+  try {
+    setLoadingUsers(true);
+    const [studentsResp, driversResp] = await Promise.all([
+      adminAPI.getUsers('student'),
+      adminAPI.getUsers('driver'),
+    ]);
+
+    // Check for token errors
+    if (checkTokenError(studentsResp) || checkTokenError(driversResp)) return;
+
+    if (studentsResp.ok) setStudents(studentsResp.data.users || []);
+    if (driversResp?.ok)
+  setDrivers(driversResp.data.users || driversResp.data.drivers || []);
+
+    
+    if (!studentsResp.ok && !driversResp.ok) {
+      showError('Info', 'User listing API not available.');
     }
-  };
+  } catch (e) {
+    console.error('Error fetching users', e);
+    showError('Error', 'Failed to fetch users');
+  } finally {
+    setLoadingUsers(false);
+  }
+};
+
 
   const handleAddStudent = async () => {
     // Validate all fields including route number
     if (!studentName || !studentEmail || !studentPassword || !studentRollNo || !studentRouteNumber) {
-      Alert.alert('Error', 'Please fill all student fields, including Route Number.');
+      showError('Error', 'Please fill all student fields, including Route Number.');
       return;
     }
     
     // Validate route number is a positive integer
     const routeNum = parseInt(studentRouteNumber);
     if (isNaN(routeNum) || routeNum <= 0) {
-      Alert.alert('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
+      showError('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
       return;
     }
 
-    const { ok, data } = await apiCall(ADMIN_ENDPOINTS.ADD_STUDENT, {
+    const response = await apiCall(ADMIN_ENDPOINTS.ADD_STUDENT, {
       method: 'POST',
       body: JSON.stringify({
         name: studentName,
@@ -167,29 +208,30 @@ export default function AdminDashboard() {
       }),
     });
 
-    if (ok) {
-      Alert.alert('Success', data.message || 'Student added successfully!');
+    if (response.ok) {
+      showError('Success', response.data.message || 'Student added successfully!');
       clearStudentForm();
       setModalVisible(false);
     } else {
-      Alert.alert('Error', data.message || 'Failed to add student.');
+      if (checkTokenError(response)) return;
+      showError('Error', response.data.message || 'Failed to add student.');
     }
   };
 
   const handleAddDriver = async () => {
     if (!driverName || !driverEmail || !driverPassword || !driverLicense || !driverRouteNumber || !driverBusNumber) {
-      Alert.alert('Error', 'Please fill all driver fields including Route Number and Bus Number.');
+      showError('Error', 'Please fill all driver fields including Route Number and Bus Number.');
       return;
     }
 
     // Validate route number is a positive integer
     const routeNum = parseInt(driverRouteNumber);
     if (isNaN(routeNum) || routeNum <= 0) {
-      Alert.alert('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
+      showError('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
       return;
     }
 
-    const { ok, data } = await apiCall(ADMIN_ENDPOINTS.ADD_DRIVER, {
+    const response = await apiCall(ADMIN_ENDPOINTS.ADD_DRIVER, {
       method: 'POST',
       body: JSON.stringify({
         name: driverName,
@@ -201,30 +243,31 @@ export default function AdminDashboard() {
       }),
     });
 
-    if (ok) {
-      Alert.alert('Success', data.message || 'Driver added successfully!');
+    if (response.ok) {
+      showError('Success', response.data.message || 'Driver added successfully!');
       clearDriverForm();
       setModalVisible(false);
     } else {
-      Alert.alert('Error', data.message || 'Failed to add driver.');
+      if (checkTokenError(response)) return;
+      showError('Error', response.data.message || 'Failed to add driver.');
     }
   };
 
   const handleAddRoute = async () => {
     if (!routeNumber || !routeName || !routeStops) {
-      Alert.alert('Error', 'Please fill all route fields including Route Number.');
+      showError('Error', 'Please fill all route fields including Route Number.');
       return;
     }
 
     // Validate route number is a positive integer
     const routeNum = parseInt(routeNumber);
     if (isNaN(routeNum) || routeNum <= 0) {
-      Alert.alert('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
+      showError('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
       return;
     }
 
     const stopsArray = routeStops.split(',').map(stop => stop.trim());
-    const { ok, data } = await apiCall(ADMIN_ENDPOINTS.ADD_ROUTE, {
+    const response = await apiCall(ADMIN_ENDPOINTS.ADD_ROUTE, {
       method: 'POST',
       body: JSON.stringify({
         routeNumber: routeNum,
@@ -233,12 +276,13 @@ export default function AdminDashboard() {
       }),
     });
 
-    if (ok) {
-      Alert.alert('Success', data.message || 'Route added successfully!');
+    if (response.ok) {
+      showError('Success', response.data.message || 'Route added successfully!');
       clearRouteForm();
       setModalVisible(false);
     } else {
-      Alert.alert('Error', data.message || 'Failed to add route.');
+      if (checkTokenError(response)) return;
+      showError('Error', response.data.message || 'Failed to add route.');
     }
   };
 
@@ -264,7 +308,7 @@ export default function AdminDashboard() {
               router.replace('/Login');
             } catch (error) {
               console.error('❌ Logout error:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
+              showError('Error', 'Failed to logout. Please try again.');
             }
           },
         },
@@ -480,16 +524,16 @@ export default function AdminDashboard() {
             }}
           />
           <MenuCard
-            title="Manage Buses"
-            icon="bus-outline"
-            colors={['#ffc107', '#b38600']}
-            onPress={() => Alert.alert('Not Implemented')}
-          />
-          <MenuCard
             title="View All Users"
             icon="people-outline"
             colors={['#17a2b8', '#0f6674']}
             onPress={() => { setUsersModalVisible(true); fetchUsers(); }}
+          />
+          <MenuCard
+            title="Send Notification"
+            icon="notifications-outline"
+            colors={['#8b5cf6', '#6d28d9']}
+            onPress={() => { setNotifModalVisible(true); }}
           />
         </View>
       </ScrollView>
@@ -522,6 +566,93 @@ export default function AdminDashboard() {
         </Pressable>
       </Modal>
 
+      {/* Notifications Modal */}
+      <Modal
+        visible={notifModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNotifModalVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setNotifModalVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <TouchableOpacity style={styles.closeButton} onPress={() => setNotifModalVisible(false)}>
+              <Ionicons name="close-circle" size={32} color="#6b7280" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Send Notification</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Title"
+              placeholderTextColor="#6b7280"
+              value={notifTitle}
+              onChangeText={setNotifTitle}
+            />
+            <TextInput
+              style={[styles.input, { height: 80 }]}
+              placeholder="Message"
+              placeholderTextColor="#6b7280"
+              value={notifBody}
+              onChangeText={setNotifBody}
+              multiline
+            />
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                style={[styles.button, { flex: 1, backgroundColor: '#10b981' }]}
+                onPress={async () => {
+                  if (!notifTitle || !notifBody) return showError('Error', 'Title and message are required');
+                  const resp = await adminAPI.sendNotification({ role: 'driver', title: notifTitle, body: notifBody });
+                  if (resp.ok) { showError('Success', 'Sent to drivers'); setNotifTitle(''); setNotifBody(''); setNotifModalVisible(false); } else { showError('Error', resp.data?.message || 'Failed to send'); }
+                }}
+              >
+                <Text style={styles.buttonText}>Notify Drivers</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.button, { flex: 1, backgroundColor: '#2563eb' }]}
+                onPress={async () => {
+                  if (!notifTitle || !notifBody) return showError('Error', 'Title and message are required');
+                  const resp = await adminAPI.sendNotification({ role: 'student', title: notifTitle, body: notifBody });
+                  if (resp.ok) { showError('Success', 'Sent to students'); setNotifTitle(''); setNotifBody(''); setNotifModalVisible(false); } else { showError('Error', resp.data?.message || 'Failed to send'); }
+                }}
+              >
+                <Text style={styles.buttonText}>Notify Students</Text>
+              </Pressable>
+            </View>
+
+            {/* Quick maintenance notice - informational only */}
+            <View style={{ marginTop: 10 }}>
+              <Pressable
+                style={[styles.button, { backgroundColor: '#6b7280' }]}
+                onPress={async () => {
+                  Alert.alert(
+                    'Send Maintenance Notice',
+                    'This will send a maintenance information message to all users. Continue?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Send',
+                        onPress: async () => {
+                          const title = 'Maintenance Notice';
+                          const body = 'We are performing scheduled maintenance. App functionality will not be affected.';
+                          const d = await adminAPI.sendNotification({ role: 'driver', title, body });
+                          const s = await adminAPI.sendNotification({ role: 'student', title, body });
+                          if (d.ok || s.ok) {
+                            showError('Success', 'Maintenance notice sent');
+                            setNotifModalVisible(false);
+                          } else {
+                            showError('Error', d.data?.message || s.data?.message || 'Failed to send');
+                          }
+                        },
+                      },
+                    ]
+                  );
+                }}
+              >
+                <Text style={styles.buttonText}>Send Maintenance Notice to All</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Users Modal */}
       <Modal
         visible={usersModalVisible}
@@ -549,15 +680,27 @@ export default function AdminDashboard() {
                 <Text style={[styles.tabText, activeUserTab === 'drivers' && styles.tabTextActive]}>Drivers</Text>
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ maxHeight: 400 }}>
-              {loadingUsers ? (
-                <Text style={{ color: '#111', textAlign: 'center' }}>Loading...</Text>
-              ) : (
-                (activeUserTab === 'students' ? students : drivers).map((u) => (
-                  <View key={u._id || u.email} style={styles.userRow}>
+            {loadingUsers ? (
+              <Text style={{ color: '#111', textAlign: 'center' }}>Loading...</Text>
+            ) : (
+              <Animated.FlatList
+                style={{ maxHeight: 420 }}
+                data={[...(activeUserTab === 'students' ? students : drivers)].sort((a, b) => {
+                  const ar = typeof a.routeNumber === 'number' ? a.routeNumber : Number.MAX_SAFE_INTEGER;
+                  const br = typeof b.routeNumber === 'number' ? b.routeNumber : Number.MAX_SAFE_INTEGER;
+                  return ar - br;
+                })}
+                keyExtractor={(item) => String(item._id || item.email)}
+                renderItem={({ item: u }) => (
+                  <View style={styles.userRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.userName}>{u.name || 'Unnamed'}</Text>
                       <Text style={styles.userSub}>{u.email}</Text>
+                    </View>
+                    <View style={[styles.pill, { backgroundColor: '#eef2ff', marginRight: 8 }]}>
+                      <Text style={[styles.pillText, { color: '#4338ca' }]}>
+                        {u.role === 'driver' ? 'Driver' : u.role === 'student' ? 'Student' : u.role}
+                      </Text>
                     </View>
                     {u.routeNumber ? (
                       <View style={styles.pill}><Text style={styles.pillText}>Route {u.routeNumber}</Text></View>
@@ -578,7 +721,7 @@ export default function AdminDashboard() {
                                 if (resp.ok) {
                                   fetchUsers();
                                 } else {
-                                  Alert.alert('Error', resp.data?.message || 'Failed to delete user');
+                                  showError('Error', resp.data?.message || 'Failed to delete user');
                                 }
                               },
                             },
@@ -589,25 +732,49 @@ export default function AdminDashboard() {
                       <Ionicons name="trash-outline" size={22} color="#ef4444" />
                     </TouchableOpacity>
                   </View>
-                ))
-              )}
-            </ScrollView>
+                )}
+                initialNumToRender={20}
+                windowSize={10}
+                getItemLayout={(_, index) => ({ length: 56, offset: 56 * index, index })}
+              />
+            )}
           </Pressable>
         </Pressable>
       </Modal>
+      
+      <ErrorModal
+        visible={errorModalVisible}
+        title={errorTitle}
+        message={errorMessage}
+        onClose={() => setErrorModalVisible(false)}
+      />
     </SafeAreaView>
   );
 }
 
-// --- Card Component ---
-const MenuCard = ({ title, icon, colors, onPress }) => (
-  <TouchableOpacity style={styles.cardWrapper} onPress={onPress}>
-    <LinearGradient colors={colors} style={styles.cardContent}>
-      <Ionicons name={icon} size={48} color="#fff" />
-      <Text style={styles.cardTitle}>{title}</Text>
-    </LinearGradient>
-  </TouchableOpacity>
-);
+
+// --- Card Component with subtle press animation ---
+const MenuCard = ({ title, icon, colors, onPress }) => {
+  const scale = React.useRef(new Animated.Value(1)).current;
+  const handleIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 20, bounciness: 6 }).start();
+  const handleOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 6 }).start();
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      style={styles.cardWrapper}
+      onPressIn={handleIn}
+      onPressOut={handleOut}
+      onPress={onPress}
+    >
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <LinearGradient colors={colors} style={styles.cardContent}>
+          <Ionicons name={icon} size={48} color="#fff" />
+          <Text style={styles.cardTitle}>{title}</Text>
+        </LinearGradient>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 // --- Styles ---
 const styles = StyleSheet.create({
@@ -625,6 +792,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 30,
     marginTop: 20,
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   title: {
     fontSize: 28,

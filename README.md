@@ -347,10 +347,10 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for details.
         <sub>Frontend Lead</sub>
     </td>
     <td align="center">
-        <a href="https://github.com/xxx">
-            <img src="https://github.com/Amog.png" width="100px;" alt="Amog"/>
+        <a href="https://github.com/amoghar29">
+            <img src="https://github.com/amoghar29.png" width="100px;" alt="Amogha"/>
             <br />
-            <sub><b>Amogh</b></sub>
+            <sub><b>Amogha</b></sub>
         </a>
         <br />
         <sub>Backend Developer</sub>

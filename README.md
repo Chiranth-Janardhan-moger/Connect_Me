@@ -335,7 +335,7 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for details.
             <sub><b>Chiranth Janardhan</b></sub>
         </a>
         <br />
-        <sub>Project Lead</sub>
+        <sub>Project Lead & Full Stack Developer</sub>
     </td>
     <td align="center">
         <a href="https://github.com/xxx">
@@ -344,7 +344,7 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for details.
             <sub><b>Divyashree G</b></sub>
         </a>
         <br />
-        <sub>Frontend Lead</sub>
+        <sub>UI/UX Developer</sub>
     </td>
     <td align="center">
         <a href="https://github.com/amoghar29">

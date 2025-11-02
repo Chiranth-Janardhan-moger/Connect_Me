@@ -12,12 +12,6 @@
 
 Real-time bus tracking system built with React Native, Node.js, and MongoDB. Track college buses in real-time, get ETAs, and never miss your bus again! 🎯
 
-[Features](#-features) •
-[Installation](#-installation) •
-[Tech Stack](#-tech-stack) •
-[Screenshots](#-screenshots) •
-[Contributing](#-contributing)
-
 <p align="center">
   <img src="frontend/assets/images/app-preview.gif" alt="ConnectMe App Demo" width="230">
 </p>

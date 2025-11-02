@@ -22,15 +22,20 @@
     "android": {
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION", 
-        "ACCESS_BACKGROUND_LOCATION",
+        "ACCESS_COARSE_LOCATION",
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.chiranth7.bmsconnect",
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_API_KEY_HERE"
+        }
+      },
+      "locationGooglePlayServicesVersion": "21.0.1"
     },
     "web": {
       "output": "static",
@@ -51,12 +56,6 @@
         }
       ],
       "expo-font",
-      [
-        "@rnmapbox/maps",
-        {
-          "RNMapboxMapsDownloadToken": "NOT_REQUIRED_FOR_OSM"
-        }
-      ]
     ],
     "experiments": {
       "typedRoutes": true,

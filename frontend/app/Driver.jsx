@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,12 @@ import {
   StyleSheet,
   StatusBar,
   ActivityIndicator,
-  Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
+import Geolocation from '@react-native-community/geolocation';
+import { PermissionsAndroid } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { driverAPI } from '../src/config/api';
 import {
@@ -18,8 +19,9 @@ import {
   emitDriverLocation,
   disconnectSocket
 } from '../src/config/socket';
-import ErrorModal from '../src/components/ErrorModal';
 import { enableDriverBackgroundUpdates, disableDriverBackgroundUpdates } from '../src/services/driverBackground';
+import ErrorModal from './components/ErrorModal';
+import { showConfirmAlert, showErrorAlert, showSuccessAlert, showWarningAlert } from './components/CustomAlert';
 
 export default function DriverDashboard() {
   const router = useRouter();
@@ -77,7 +79,7 @@ export default function DriverDashboard() {
           typeof user.routeNumber === 'number' ? String(user.routeNumber) : (user.routeNumber || 'N/A')
         );
         setBusNumber(user.busNumber || 'N/A');
-        console.log('👤 Driver info loaded:', user);
+        console.log('Driver info loaded:', user);
       }
     } catch (error) {
       console.error('Error loading driver info:', error);
@@ -85,18 +87,15 @@ export default function DriverDashboard() {
   };
 
   const handleStartTrip = async () => {
-    Alert.alert(
+    showConfirmAlert(
       'Start Trip',
       'Are you sure you want to start the trip?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Start',
-          onPress: async () => {
-            await startTrip();
-          },
-        },
-      ]
+      async () => {
+        await startTrip();
+      },
+      () => {
+        console.log('Start trip cancelled');
+      }
     );
   };
 
@@ -104,19 +103,51 @@ export default function DriverDashboard() {
     setLoading(true);
 
     try {
-      // Check location permissions
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Request location permissions (Android)
+      console.log('Requesting location permissions...');
       
-      if (status !== 'granted') {
-        showError(
-          'Permission Required',
-          'Location permission is required to track the bus.'
+      if (Platform.OS === 'android') {
+        const fineLocationGranted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          {
+            title: 'Location Permission',
+            message: 'BMS Connect needs access to your location to track the bus.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          }
         );
-        setLoading(false);
-        return;
+        
+        if (fineLocationGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+          showWarningAlert(
+            'Permission Required',
+            'Location permission is required to track the bus.\n\nPlease grant location permission in your phone settings to start tracking.'
+          );
+          setLoading(false);
+          return;
+        }
+        
+        // Request background location for Android 10+
+        if (Platform.Version >= 29) {
+          const backgroundGranted = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.ACCESS_BACKGROUND_LOCATION,
+            {
+              title: 'Background Location Permission',
+              message: 'Allow BMS Connect to access location in the background for continuous tracking.',
+              buttonNeutral: 'Ask Me Later',
+              buttonNegative: 'Cancel',
+              buttonPositive: 'OK',
+            }
+          );
+          
+          if (backgroundGranted !== PermissionsAndroid.RESULTS.GRANTED) {
+            console.warn('⚠️ Background location not granted, tracking may stop when app is closed');
+          }
+        }
       }
-
-      console.log('🚀 Starting trip...');
+      
+      console.log('Location permissions granted');
+      console.log('Starting trip...');
 
       // Make API call to start trip
       let response = await driverAPI.startTrip();
@@ -141,7 +172,7 @@ export default function DriverDashboard() {
         try { await enableDriverBackgroundUpdates(userDataRef.current?.routeNumber ?? routeNumber); } catch (_) {}
         await startLocationTracking();
         
-        showError('Success', 'Trip started successfully!');
+        showSuccessAlert('Success', 'Trip started successfully!');
       } else {
         console.error('❌ Failed to start trip:', response.data);
         
@@ -149,23 +180,24 @@ export default function DriverDashboard() {
         if (response.status === 400 || response.status === 401) {
           const message = response.data?.message?.toLowerCase() || '';
           if (message.includes('token') || message.includes('denied') || message.includes('unauthorized')) {
-            Alert.alert(
+            showConfirmAlert(
               'Session Expired',
               'Your session has expired. Please login again.',
-              [{ text: 'OK', onPress: () => router.replace('/Login') }]
+              () => router.replace('/Login'),
+              () => console.log('Session expired login cancelled')
             );
             return;
           }
         }
         
-        showError(
-          'Error',
+        showErrorAlert(
+          'Start Trip Failed',
           response.data?.message || 'Failed to start trip. Please try again.'
         );
       }
     } catch (error) {
       console.error('❌ Error starting trip:', error);
-      showError('Error', 'Unable to start trip. Please try again.');
+      showErrorAlert('Trip Error', 'Unable to start trip. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -173,30 +205,27 @@ export default function DriverDashboard() {
 
   const startLocationTracking = async () => {
     try {
-      console.log('📍 Starting location tracking...');
+      console.log('Starting native location tracking...');
 
       const user = userDataRef.current;
       if (!user || (!user.routeNumber && !user.busId)) {
         console.error('❌ User data not available');
-        showError('Error', 'Driver information not found');
+        showErrorAlert('Driver Not Found', 'Driver information not found. Please login again.');
         return;
       }
 
-      // Start watching location with high accuracy
-      locationSubscription.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 5000, // Update every 5 seconds
-          distanceInterval: 10, // Or when moved 10 meters
-        },
-        (location) => {
+      // Start watching location with high accuracy using native geolocation
+      console.log('Starting native location watch for driver...');
+      
+      const watchId = Geolocation.watchPosition(
+        (position) => {
           try {
-            if (!location || !location.coords) {
+            if (!position || !position.coords) {
               console.warn('Invalid location data received');
               return;
             }
 
-            const { latitude, longitude } = location.coords;
+            const { latitude, longitude, accuracy } = position.coords;
             
             // Validate coordinates
             if (typeof latitude !== 'number' || typeof longitude !== 'number' || 
@@ -205,7 +234,16 @@ export default function DriverDashboard() {
               return;
             }
 
-            console.log('📡 Location update:', latitude, longitude);
+            // Filter out extremely inaccurate readings
+            if (accuracy > 200) {
+              console.log('⚠️ Ignoring inaccurate reading:', Math.round(accuracy), 'm');
+              return;
+            }
+
+            console.log('Driver location update:');
+            console.log('   Latitude:', latitude);
+            console.log('   Longitude:', longitude);
+            console.log('   Accuracy:', Math.round(accuracy), 'm');
 
             // Emit location to server using routeNumber (fallback to busId only if necessary)
             const roomId = user.routeNumber ?? user.busId;
@@ -217,43 +255,69 @@ export default function DriverDashboard() {
           } catch (locationError) {
             console.error('Error processing location update:', locationError);
           }
+        },
+        (error) => {
+          console.error('❌ Native location error:', error.message);
+          
+          // Handle specific error codes
+          if (error.code === 1) {
+            showErrorAlert('Permission Denied', 'Location permission was denied. Please enable it in settings.');
+          } else if (error.code === 2) {
+            showErrorAlert('GPS Unavailable', 'GPS is currently unavailable. Please check your GPS settings.');
+          } else if (error.code === 3) {
+            console.warn('Location timeout, will retry...');
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 20000, // 20 seconds timeout
+          maximumAge: 1000, // Accept 1 second old location
+          distanceFilter: 10, // Update every 10 meters
+          interval: 5000, // Update every 5 seconds (Android)
+          fastestInterval: 3000, // Fastest update rate (Android)
         }
       );
 
-      console.log('✅ Location tracking started');
+      // Store watch ID for cleanup
+      locationSubscription.current = { remove: () => Geolocation.clearWatch(watchId) };
+
+      console.log('✅ Native location tracking started with watch ID:', watchId);
     } catch (error) {
       console.error('❌ Error starting location tracking:', error);
-      showError('Error', 'Failed to start location tracking. Please check GPS settings.');
+      showErrorAlert('GPS Error', 'Failed to start location tracking. Please check GPS settings and ensure location permissions are granted.');
     }
   };
 
   const stopLocationTracking = () => {
     if (locationSubscription.current) {
-      locationSubscription.current.remove();
+      try {
+        locationSubscription.current.remove();
+        console.log('✅ Native location tracking stopped');
+      } catch (error) {
+        console.error('Error stopping location tracking:', error);
+      }
       locationSubscription.current = null;
-      console.log('🛑 Location tracking stopped');
     }
 
     if (locationIntervalRef.current) {
       clearInterval(locationIntervalRef.current);
       locationIntervalRef.current = null;
     }
+    
+    // Clear all watches
+    Geolocation.stopObserving();
   };
 
   const handleEndTrip = async () => {
-    Alert.alert(
+    showConfirmAlert(
       'End Trip',
       'Are you sure you want to end the trip?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'End Trip',
-          style: 'destructive',
-          onPress: async () => {
-            await endTrip();
-          },
-        },
-      ]
+      async () => {
+        await endTrip();
+      },
+      () => {
+        console.log('End trip cancelled');
+      }
     );
   };
 
@@ -262,7 +326,7 @@ export default function DriverDashboard() {
     setLoading(true);
 
     try {
-      console.log('🏁 Ending trip...');
+      console.log('Ending trip...');
 
       // Immediately stop any live emissions to avoid races
       try { stopLocationTracking(); } catch (_) {}
@@ -279,7 +343,7 @@ export default function DriverDashboard() {
         // Ensure socket is disconnected after ending
         try { disconnectSocket(); } catch (_) {}
         try { await AsyncStorage.removeItem('driver_trip_active'); } catch (_) {}
-        showError('Success', 'Trip ended successfully!');
+        showSuccessAlert('Success', 'Trip ended successfully!');
       } else {
         console.error('❌ Failed to end trip:', response.data);
         
@@ -287,23 +351,24 @@ export default function DriverDashboard() {
         if (response.status === 400 || response.status === 401) {
           const message = response.data?.message?.toLowerCase() || '';
           if (message.includes('token') || message.includes('denied') || message.includes('unauthorized')) {
-            Alert.alert(
+            showConfirmAlert(
               'Session Expired',
               'Your session has expired. Please login again.',
-              [{ text: 'OK', onPress: () => router.replace('/Login') }]
+              () => router.replace('/Login'),
+              () => console.log('Session expired login cancelled')
             );
             return;
           }
         }
         
-        showError(
-          'Error',
+        showErrorAlert(
+          'End Trip Failed',
           response.data?.message || 'Failed to end trip. Please try again.'
         );
       }
     } catch (error) {
       console.error('❌ Error ending trip:', error);
-      showError('Error', 'Unable to end trip. Please try again.');
+      showErrorAlert('Trip Error', 'Unable to end trip. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -311,29 +376,47 @@ export default function DriverDashboard() {
 
   const handleLogout = async () => {
     if (tripStatus === 'ON_ROUTE') {
-      showError(
+      showWarningAlert(
         'Trip in Progress',
-        'Please end the current trip before logging out.'
+        'Please end the current trip before logging out.\n\nMake sure to complete your current trip before logging out to ensure proper tracking.'
       );
       return;
     }
 
-    Alert.alert(
+    showConfirmAlert(
       'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            stopLocationTracking();
-            disconnectSocket();
-            await AsyncStorage.multiRemove(['authToken', 'user', 'userRole']);
+      'Are you sure you want to logout from driver mode?',
+      async () => {
+        try {
+          console.log('Driver logging out...');
+          
+          // Stop location tracking and disconnect socket
+          stopLocationTracking();
+          disconnectSocket();
+          
+          // Clear all session data
+          await AsyncStorage.multiRemove([
+            'authToken',
+            'user',
+            'userRole',
+            'driver_trip_active',
+            'driver_route_number'
+          ]);
+          
+          showSuccessAlert('Logged Out', 'You have been successfully logged out from driver mode.');
+          
+          // Navigate to login after a short delay
+          setTimeout(() => {
             router.replace('/Login');
-          },
-        },
-      ]
+          }, 1000);
+        } catch (error) {
+          console.error('Driver logout error:', error);
+          showErrorAlert('Logout Failed', 'Failed to logout. Please try again.');
+        }
+      },
+      () => {
+        console.log('Driver logout cancelled');
+      }
     );
   };
 

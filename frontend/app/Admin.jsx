@@ -4,12 +4,11 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Alert,
+  Modal,
   ScrollView,
   Pressable,
-  Modal,
-  Dimensions,
   TouchableOpacity,
+  Dimensions,
   Animated,
 } from 'react-native';
 // 1. Import SafeAreaView from the correct package
@@ -18,11 +17,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import ErrorModal from './components/ErrorModal';
+import { showConfirmAlert, showErrorAlert, showSuccessAlert, showInfoAlert } from './components/CustomAlert';
 
 // Adjust this import path to your apiService.js file
 import { apiCall, authAPI, adminAPI } from '../src/config/api'; 
 import NetInfo from '@react-native-community/netinfo';
-import ErrorModal from '../src/components/ErrorModal';
 
 const { width } = Dimensions.get('window');
 
@@ -93,11 +93,8 @@ export default function AdminDashboard() {
     if (response.status === 400 || response.status === 401) {
       const message = response.data?.message?.toLowerCase() || '';
       if (message.includes('token') || message.includes('denied') || message.includes('unauthorized')) {
-        Alert.alert(
-          'Session Expired',
-          'Your session has expired. Please login again.',
-          [{ text: 'OK', onPress: () => router.replace('/Login') }]
-        );
+        showInfoAlert('Session Expired', 'Your session has expired. Please login again.');
+        router.replace('/Login');
         return true;
       }
     }
@@ -145,11 +142,11 @@ export default function AdminDashboard() {
         setAvailableRoutes(response.data.routes || []);
       } else {
         if (checkTokenError(response)) return;
-        showError('Error', 'Failed to fetch routes');
+        showErrorAlert('Error', 'Failed to fetch routes');
       }
     } catch (error) {
       console.error('Error fetching routes:', error);
-      showError('Error', 'Failed to fetch routes');
+      showErrorAlert('Error', 'Failed to fetch routes');
     } finally {
       setLoadingRoutes(false);
     }
@@ -172,11 +169,11 @@ export default function AdminDashboard() {
 
     
     if (!studentsResp.ok && !driversResp.ok) {
-      showError('Info', 'User listing API not available.');
+      showInfoAlert('Info', 'User listing API not available.');
     }
   } catch (e) {
     console.error('Error fetching users', e);
-    showError('Error', 'Failed to fetch users');
+    showErrorAlert('Error', 'Failed to fetch users');
   } finally {
     setLoadingUsers(false);
   }
@@ -186,14 +183,14 @@ export default function AdminDashboard() {
   const handleAddStudent = async () => {
     // Validate all fields including route number
     if (!studentName || !studentEmail || !studentPassword || !studentRollNo || !studentRouteNumber) {
-      showError('Error', 'Please fill all student fields, including Route Number.');
+      showErrorAlert('Error', 'Please fill all student fields, including Route Number.');
       return;
     }
     
     // Validate route number is a positive integer
     const routeNum = parseInt(studentRouteNumber);
     if (isNaN(routeNum) || routeNum <= 0) {
-      showError('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
+      showErrorAlert('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
       return;
     }
 
@@ -209,25 +206,25 @@ export default function AdminDashboard() {
     });
 
     if (response.ok) {
-      showError('Success', response.data.message || 'Student added successfully!');
+      showSuccessAlert('Success', response.data.message || 'Student added successfully!');
       clearStudentForm();
       setModalVisible(false);
     } else {
       if (checkTokenError(response)) return;
-      showError('Error', response.data.message || 'Failed to add student.');
+      showErrorAlert('Error', response.data.message || 'Failed to add student.');
     }
   };
 
   const handleAddDriver = async () => {
     if (!driverName || !driverEmail || !driverPassword || !driverLicense || !driverRouteNumber || !driverBusNumber) {
-      showError('Error', 'Please fill all driver fields including Route Number and Bus Number.');
+      showErrorAlert('Error', 'Please fill all driver fields including Route Number and Bus Number.');
       return;
     }
 
     // Validate route number is a positive integer
     const routeNum = parseInt(driverRouteNumber);
     if (isNaN(routeNum) || routeNum <= 0) {
-      showError('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
+      showErrorAlert('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
       return;
     }
 
@@ -244,25 +241,25 @@ export default function AdminDashboard() {
     });
 
     if (response.ok) {
-      showError('Success', response.data.message || 'Driver added successfully!');
+      showSuccessAlert('Success', response.data.message || 'Driver added successfully!');
       clearDriverForm();
       setModalVisible(false);
     } else {
       if (checkTokenError(response)) return;
-      showError('Error', response.data.message || 'Failed to add driver.');
+      showErrorAlert('Error', response.data.message || 'Failed to add driver.');
     }
   };
 
   const handleAddRoute = async () => {
     if (!routeNumber || !routeName || !routeStops) {
-      showError('Error', 'Please fill all route fields including Route Number.');
+      showErrorAlert('Error', 'Please fill all route fields including Route Number.');
       return;
     }
 
     // Validate route number is a positive integer
     const routeNum = parseInt(routeNumber);
     if (isNaN(routeNum) || routeNum <= 0) {
-      showError('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
+      showErrorAlert('Error', 'Route number must be a positive integer (e.g., 1, 2, 12).');
       return;
     }
 
@@ -277,42 +274,43 @@ export default function AdminDashboard() {
     });
 
     if (response.ok) {
-      showError('Success', response.data.message || 'Route added successfully!');
+      showSuccessAlert('Success', response.data.message || 'Route added successfully!');
       clearRouteForm();
       setModalVisible(false);
     } else {
       if (checkTokenError(response)) return;
-      showError('Error', response.data.message || 'Failed to add route.');
+      showErrorAlert('Error', response.data.message || 'Failed to add route.');
     }
   };
 
   const handleLogout = () => {
-    Alert.alert(
+    showConfirmAlert(
       'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('🚪 Logging out...');
-              await authAPI.logout(); 
-              await AsyncStorage.multiRemove([
-                'authToken',
-                'user',
-                'userRole',
-              ]);
-              console.log('✅ Session cleared');
-              router.replace('/Login');
-            } catch (error) {
-              console.error('❌ Logout error:', error);
-              showError('Error', 'Failed to logout. Please try again.');
-            }
-          },
-        },
-      ]
+      'Are you sure you want to logout from admin panel?',
+      async () => {
+        try {
+          console.log('Logging out...');
+          await authAPI.logout(); 
+          await AsyncStorage.multiRemove([
+            'authToken',
+            'user',
+            'userRole'
+          ]);
+          
+          showSuccessAlert('Logged Out', 'You have been successfully logged out from admin panel.');
+          
+          // Navigate to login after a short delay
+          setTimeout(() => {
+            router.replace('/Login');
+          }, 1000);
+        } catch (error) {
+          console.error('Logout error:', error);
+          showErrorAlert('Logout Failed', 'Failed to logout. Please try again.');
+        }
+      },
+      () => {
+        console.log('Logout cancelled');
+      }
     );
   };
 
@@ -598,9 +596,19 @@ export default function AdminDashboard() {
               <Pressable
                 style={[styles.button, { flex: 1, backgroundColor: '#10b981' }]}
                 onPress={async () => {
-                  if (!notifTitle || !notifBody) return showError('Error', 'Title and message are required');
+                  if (!notifTitle || !notifBody) {
+                    showErrorAlert('❌ Error', 'Title and message are required');
+                    return;
+                  }
                   const resp = await adminAPI.sendNotification({ role: 'driver', title: notifTitle, body: notifBody });
-                  if (resp.ok) { showError('Success', 'Sent to drivers'); setNotifTitle(''); setNotifBody(''); setNotifModalVisible(false); } else { showError('Error', resp.data?.message || 'Failed to send'); }
+                  if (resp.ok) {
+                    showSuccessAlert('✅ Success', 'Notification sent to drivers');
+                    setNotifTitle('');
+                    setNotifBody('');
+                    setNotifModalVisible(false);
+                  } else {
+                    showErrorAlert('❌ Error', resp.data?.message || 'Failed to send notification');
+                  }
                 }}
               >
                 <Text style={styles.buttonText}>Notify Drivers</Text>
@@ -608,9 +616,19 @@ export default function AdminDashboard() {
               <Pressable
                 style={[styles.button, { flex: 1, backgroundColor: '#2563eb' }]}
                 onPress={async () => {
-                  if (!notifTitle || !notifBody) return showError('Error', 'Title and message are required');
+                  if (!notifTitle || !notifBody) {
+                    showErrorAlert('❌ Error', 'Title and message are required');
+                    return;
+                  }
                   const resp = await adminAPI.sendNotification({ role: 'student', title: notifTitle, body: notifBody });
-                  if (resp.ok) { showError('Success', 'Sent to students'); setNotifTitle(''); setNotifBody(''); setNotifModalVisible(false); } else { showError('Error', resp.data?.message || 'Failed to send'); }
+                  if (resp.ok) {
+                    showSuccessAlert('✅ Success', 'Notification sent to students');
+                    setNotifTitle('');
+                    setNotifBody('');
+                    setNotifModalVisible(false);
+                  } else {
+                    showErrorAlert('❌ Error', resp.data?.message || 'Failed to send notification');
+                  }
                 }}
               >
                 <Text style={styles.buttonText}>Notify Students</Text>
@@ -622,27 +640,29 @@ export default function AdminDashboard() {
               <Pressable
                 style={[styles.button, { backgroundColor: '#6b7280' }]}
                 onPress={async () => {
-                  Alert.alert(
-                    'Send Maintenance Notice',
-                    'This will send a maintenance information message to all users. Continue?',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Send',
-                        onPress: async () => {
-                          const title = 'Maintenance Notice';
-                          const body = 'We are performing scheduled maintenance. App functionality will not be affected.';
-                          const d = await adminAPI.sendNotification({ role: 'driver', title, body });
-                          const s = await adminAPI.sendNotification({ role: 'student', title, body });
-                          if (d.ok || s.ok) {
-                            showError('Success', 'Maintenance notice sent');
-                            setNotifModalVisible(false);
-                          } else {
-                            showError('Error', d.data?.message || s.data?.message || 'Failed to send');
-                          }
-                        },
-                      },
-                    ]
+                  showConfirmAlert(
+                    '🔧 Send Maintenance Notice',
+                    'This will send a maintenance information message to all users. Continue?\n\nMessage: "We are performing scheduled maintenance. App functionality will not be affected."',
+                    async () => {
+                      try {
+                        const title = 'Maintenance Notice';
+                        const body = 'We are performing scheduled maintenance. App functionality will not be affected.';
+                        const d = await adminAPI.sendNotification({ role: 'driver', title, body });
+                        const s = await adminAPI.sendNotification({ role: 'student', title, body });
+                        if (d.ok || s.ok) {
+                          showSuccessAlert('✅ Success', 'Maintenance notice sent to all users');
+                          setNotifModalVisible(false);
+                        } else {
+                          showErrorAlert('❌ Error', d.data?.message || s.data?.message || 'Failed to send maintenance notice');
+                        }
+                      } catch (error) {
+                        console.error('Maintenance notice error:', error);
+                        showErrorAlert('❌ Maintenance Notice Failed', 'Failed to send maintenance notice. Please try again.');
+                      }
+                    },
+                    () => {
+                      console.log('Maintenance notice cancelled');
+                    }
                   );
                 }}
               >
@@ -708,24 +728,25 @@ export default function AdminDashboard() {
                     <TouchableOpacity
                       style={{ marginLeft: 12 }}
                       onPress={async () => {
-                        Alert.alert(
-                          'Delete User',
-                          `Are you sure you want to delete ${u.name || 'this user'}?`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Delete',
-                              style: 'destructive',
-                              onPress: async () => {
-                                const resp = await adminAPI.deleteUser(u._id);
-                                if (resp.ok) {
-                                  fetchUsers();
-                                } else {
-                                  showError('Error', resp.data?.message || 'Failed to delete user');
-                                }
-                              },
-                            },
-                          ]
+                        showConfirmAlert(
+                          '🗑️ Delete User',
+                          `Are you sure you want to delete ${u.name || 'this user'}?\n\nThis action cannot be undone.`,
+                          async () => {
+                            try {
+                              const resp = await adminAPI.deleteUser(u._id);
+                              if (resp.ok) {
+                                fetchUsers();
+                              } else {
+                                showErrorAlert('❌ Delete Failed', resp.data?.message || 'Failed to delete user');
+                              }
+                            } catch (error) {
+                              console.error('Delete user error:', error);
+                              showErrorAlert('❌ Delete Failed', 'Failed to delete user. Please try again.');
+                            }
+                          },
+                          () => {
+                            console.log('Delete user cancelled');
+                          }
                         );
                       }}
                     >

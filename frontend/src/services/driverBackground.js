@@ -1,76 +1,102 @@
-import * as TaskManager from 'expo-task-manager';
-import * as Location from 'expo-location';
+// Native background location service for driver
+import { Platform, AppState } from 'react-native';
+import Geolocation from '@react-native-community/geolocation';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSocket, connectDriverSocket, emitDriverLocation } from '../config/socket';
 
-export const DRIVER_LOCATION_TASK = 'DRIVER_LOCATION_TASK';
+let backgroundWatchId = null;
+let isBackgroundTrackingActive = false;
 
-// Define background task once
-try {
-  if (!TaskManager.isTaskDefined(DRIVER_LOCATION_TASK)) {
-    TaskManager.defineTask(DRIVER_LOCATION_TASK, async ({ data, error }) => {
+// Background location watcher
+const startBackgroundLocationWatch = (routeNumber) => {
+  if (backgroundWatchId !== null) {
+    console.log('⚠️ Background watch already active');
+    return;
+  }
+
+  console.log('🚀 Starting native background location watch for route:', routeNumber);
+  
+  backgroundWatchId = Geolocation.watchPosition(
+    (position) => {
       try {
-        if (error) return;
-        const { locations } = data || {};
-        if (!locations || locations.length === 0) return;
-        const latest = locations[locations.length - 1];
-        const { latitude, longitude } = latest.coords || {};
-        if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
-
-        const routeNumber = await AsyncStorage.getItem('driver_route_number');
-        if (!routeNumber) return;
-
+        const { latitude, longitude, accuracy } = position.coords;
+        
+        // Filter out extremely inaccurate readings
+        if (accuracy > 200) {
+          console.log('[Background] Ignoring inaccurate reading:', Math.round(accuracy), 'm');
+          return;
+        }
+        
+        console.log('[Background] Location update:', latitude.toFixed(6), longitude.toFixed(6), 'Accuracy:', Math.round(accuracy), 'm');
+        
+        // Emit to backend
         const socket = getSocket();
         if (!socket || !socket.connected) {
           connectDriverSocket();
         }
         emitDriverLocation(routeNumber, latitude, longitude);
-      } catch (_) {}
-    });
+      } catch (error) {
+        console.error('[Background] Error processing location:', error);
+      }
+    },
+    (error) => {
+      console.error('[Background] Location error:', error.message);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 20000,
+      maximumAge: 1000,
+      distanceFilter: 10, // Update every 10 meters
+      interval: 5000, // Update every 5 seconds
+      fastestInterval: 3000,
+    }
+  );
+  
+  isBackgroundTrackingActive = true;
+  console.log('✅ Background location watch started with ID:', backgroundWatchId);
+};
+
+const stopBackgroundLocationWatch = () => {
+  if (backgroundWatchId !== null) {
+    Geolocation.clearWatch(backgroundWatchId);
+    backgroundWatchId = null;
+    isBackgroundTrackingActive = false;
+    console.log('✅ Background location watch stopped');
   }
-} catch (_) {}
+};
 
 export const enableDriverBackgroundUpdates = async (routeNumber) => {
   try {
+    console.log('📍 Enabling native background location updates for route:', routeNumber);
+    
     await AsyncStorage.setItem('driver_trip_active', '1');
     await AsyncStorage.setItem('driver_route_number', String(routeNumber));
 
-    const hasPerm = await Location.getForegroundPermissionsAsync();
-    if (hasPerm.status !== 'granted') {
-      await Location.requestForegroundPermissionsAsync();
+    // Start native background location watch
+    if (!isBackgroundTrackingActive) {
+      startBackgroundLocationWatch(routeNumber);
     }
-    const bgPerm = await Location.getBackgroundPermissionsAsync();
-    if (bgPerm.status !== 'granted') {
-      await Location.requestBackgroundPermissionsAsync();
-    }
-
-    const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK);
-    if (!isRunning) {
-      await Location.startLocationUpdatesAsync(DRIVER_LOCATION_TASK, {
-        accuracy: Location.Accuracy.Balanced,
-        timeInterval: 5000,
-        distanceInterval: 10,
-        showsBackgroundLocationIndicator: true,
-        pausesUpdatesAutomatically: true,
-        foregroundService: {
-          notificationTitle: 'BMS Connect',
-          notificationBody: 'Broadcasting bus location',
-        },
-      });
-    }
-  } catch (e) {
+    
+    console.log('✅ Native background updates enabled');
+  } catch (error) {
+    console.error('❌ Failed to enable background updates:', error);
     // Swallow; foreground tracking still works
   }
 };
 
 export const disableDriverBackgroundUpdates = async () => {
   try {
+    console.log('🛑 Disabling native background location updates');
+    
     await AsyncStorage.removeItem('driver_trip_active');
-    const isRunning = await Location.hasStartedLocationUpdatesAsync(DRIVER_LOCATION_TASK);
-    if (isRunning) {
-      await Location.stopLocationUpdatesAsync(DRIVER_LOCATION_TASK);
-    }
-  } catch (e) {}
+    
+    // Stop native background location watch
+    stopBackgroundLocationWatch();
+    
+    console.log('✅ Native background updates disabled');
+  } catch (error) {
+    console.error('❌ Failed to disable background updates:', error);
+  }
 };
 
 

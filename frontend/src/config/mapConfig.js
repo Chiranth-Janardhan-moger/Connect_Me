@@ -19,15 +19,12 @@ export const ZOOM_LEVELS = {
   DEFAULT: 12, // Default view
 };
 
-// Map style URLs (Free OpenStreetMap tiles)
+// Map style URLs (Free OpenStreetMap tiles - NO API KEYS NEEDED)
 export const MAP_STYLES = {
   // OpenStreetMap style (free, no API key)
   OSM: 'https://tiles.openfreemap.org/styles/liberty',
   
-  // Maptiler basic (free tier available)
-  MAPTILER_BASIC: 'https://api.maptiler.com/maps/basic-v2/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
-  
-  // OpenMapTiles (self-hosted option)
+  // OpenMapTiles (self-hosted option, no API key)
   OPENMAP: 'https://tiles.openfreemap.org/styles/positron',
 };
 

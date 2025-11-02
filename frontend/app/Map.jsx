@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
   Text,
 } from 'react-native';
-import MapView, { Polyline, PROVIDER_GOOGLE, Marker } from 'react-native-maps';
+import OpenStreetMapView from './components/OpenStreetMapView';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { studentAPI } from '../src/config/api';
@@ -19,10 +19,11 @@ import { useBusTracking } from '../src/hooks/useBusTracking';
 import { MapHeader } from './components/MapHeader';
 import { StatusBanner } from './components/StatusBanner';
 import { ETACard } from './components/ETACard';
-import { RouteStopMarkers, BusMarker, StudentMarker } from './components/MapMarkers';
 import ErrorBoundary from './components/ErrorBoundary';
+import { showErrorAlert, showWarningAlert } from './components/CustomAlert';
+import { NetworkAlert } from './components/NetworkAlert';
+import { useNetworkStatus } from '../src/hooks/useNetworkStatus';
 import { fetchETA } from '../src/services/etaService';
-import ErrorModal from '../src/components/ErrorModal';
 import { getPreloaded, preloadMapData } from '../src/services/mapPreload';
 
 function MapScreen() {
@@ -31,17 +32,18 @@ function MapScreen() {
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
+  const [gpsLoading, setGpsLoading] = useState(true);
   const [mapError, setMapError] = useState(false);
   const [routeData, setRouteData] = useState(null);
   const [etaText, setEtaText] = useState(null);
   const [distanceText, setDistanceText] = useState(null);
   const [stopsAway, setStopsAway] = useState(null);
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [errorTitle, setErrorTitle] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
   const hasCenteredMap = useRef(false);
   const hasCenteredOnBus = useRef(false);
   const mapReadyRef = useRef(false);
+
+  // Network status monitoring
+  const { isOnline } = useNetworkStatus();
 
   const {
     location: studentLocation,
@@ -49,6 +51,8 @@ function MapScreen() {
     initLocation,
     startTracking,
     ensureAnimatedFromLocation,
+    isTracking,
+    error: locationError,
   } = useLocation();
 
   const {
@@ -102,7 +106,10 @@ function MapScreen() {
   };
 
   const updateETA = async () => {
+    console.log('📍 Update ETA - busLocation:', busLocation, 'studentLocation:', studentLocation);
+    
     if (!busLocation || !studentLocation) {
+      console.log('⚠️ Cannot calculate ETA - missing locations');
       setEtaText(null);
       setDistanceText(null);
       setStopsAway(null);
@@ -110,12 +117,14 @@ function MapScreen() {
     }
 
     try {
+      console.log('🧮 Calculating ETA...');
       const result = await fetchETA(
         busLocation, 
         studentLocation, 
         routeData?.stops || null
       );
       
+      console.log('✅ ETA calculated:', result);
       setEtaText(result.etaText);
       setDistanceText(result.distanceText);
       
@@ -123,7 +132,7 @@ function MapScreen() {
         setStopsAway(result.stopsAway);
       }
     } catch (error) {
-      console.error('Update ETA error:', error);
+      console.error('❌ Update ETA error:', error);
     }
   };
 
@@ -173,15 +182,7 @@ function MapScreen() {
   useEffect(() => {
     const init = async () => {
       try {
-        setLoading(true);
-
-        // Fetch route data first
         const pre = getPreloaded();
-        if (!pre.startedAt) {
-          // kick off preloading but don't block
-          preloadMapData().catch(() => {});
-        }
-
         if (pre?.routeData?.routeNumber) {
           const localRouteData = BANGALORE_STOPS[pre.routeData.routeNumber];
           if (localRouteData) setRouteData(localRouteData);
@@ -190,35 +191,59 @@ function MapScreen() {
           await fetchRouteData();
         }
 
-        // Try to get location, but don't fail if it doesn't work
+        // ALWAYS start location tracking
+        console.log('🔍 Initializing student location...');
+        setGpsLoading(true);
+        
         try {
-          const pre = getPreloaded();
-          const loc = pre?.location || (await initLocation());
+          console.log('🚀 Starting location initialization...');
+          const loc = await initLocation();
           if (loc) {
+            console.log('✅ Got initial location:', loc.latitude, loc.longitude);
             try { ensureAnimatedFromLocation(loc); } catch (_) {}
             centerMapOnLocation(loc);
-            setTimeout(() => startTracking(), 1000);
+            setGpsLoading(false);
+            
+            // Start tracking after getting initial location
+            setTimeout(() => {
+              console.log('🎯 Starting location tracking...');
+              startTracking();
+            }, 1000);
+          } else {
+            console.warn('⚠️ initLocation() returned null - GPS failed');
+            setGpsLoading(false);
+            
+            // Show clean error alert without fake location
+            if (locationError) {
+              showWarningAlert(
+                '📍 Location Required',
+                locationError + 
+                '\n\nTo track the bus, we need your location.\n\nPlease:\n• Enable GPS in your phone settings\n• Grant location permission to this app\n• Go outdoors or near a window\n• Wait 30-60 seconds for GPS to lock'
+              );
+            }
           }
         } catch (locationError) {
-          console.warn('Location initialization failed:', locationError);
-          // Continue without location
+          console.warn('❌ Location init failed:', locationError.message);
+          setGpsLoading(false);
+          
+          showErrorAlert(
+            '📍 Location Error',
+            locationError.message + 
+            '\n\nTo track the bus, we need your location.\n\nPlease:\n• Enable GPS in your phone settings\n• Grant location permission to this app\n• Go outdoors or near a window\n• Restart the app and wait 30-60 seconds'
+          );
         }
 
-        // Try to get bus location, but don't fail if it doesn't work
+        // Try to get bus location
         try {
-          const pre = getPreloaded();
-          const busLoc = pre?.busLocation || (await checkTripStatus());
+          const busLoc = await checkTripStatus();
           if (busLoc) {
             centerMapOnLocation(busLoc);
           }
         } catch (busError) {
           console.warn('Bus location check failed:', busError);
-          // Continue without bus location
         }
       } catch (error) {
         console.error('Init error:', error);
-        // Don't show error modal, just log and continue
-        console.warn('Map initialization had issues, but continuing');
       } finally {
         setLoading(false);
       }
@@ -278,6 +303,59 @@ function MapScreen() {
     return DEFAULT_REGION;
   }, [studentLocation, routeData]);
 
+  // Extract stable coordinate values to prevent unnecessary re-renders
+  const studentLat = studentLocation?.latitude;
+  const studentLng = studentLocation?.longitude;
+  const busLat = busLocation?.latitude;
+  const busLng = busLocation?.longitude;
+  
+
+  // Create stable markers array
+  const mapMarkers = useMemo(() => {
+    const markers = [];
+    
+    // 1. Route stops (NEVER change - add once)
+    if (routeData?.stops) {
+      routeData.stops.forEach((stop, index) => {
+        markers.push({
+          id: `stop-${stop.id}`,
+          coordinate: { latitude: stop.lat, longitude: stop.lng },
+          type: index === 0 ? 'start' : (index === routeData.stops.length - 1 ? 'end' : 'middle'),
+          title: `${stop.name} - ${stop.time}`
+        });
+      });
+    }
+    
+    // 2. Bus marker (only when trip is active)
+    console.log('🚌 Bus check - tripStatus:', tripStatus, 'busLat:', busLat, 'busLng:', busLng);
+    if (tripStatus === 'ON_ROUTE' && busLat != null && busLng != null) {
+      console.log('✅ Adding bus marker:', busLat, busLng);
+      markers.push({
+        id: 'bus',
+        coordinate: { latitude: busLat, longitude: busLng },
+        type: 'bus',
+        title: 'Bus - Live Location'
+      });
+    } else if (tripStatus === 'ON_ROUTE') {
+      console.log('⚠️ Trip is ON_ROUTE but no bus coordinates');
+    }
+    
+    // 3. Student marker (your location) - only show if location is available
+    if (studentLat != null && studentLng != null) {
+      console.log('✅ Adding student marker:', studentLat, studentLng);
+      markers.push({
+        id: 'student',
+        coordinate: { latitude: studentLat, longitude: studentLng },
+        type: 'student',
+        title: 'Your Location'
+      });
+    }
+    // No fallback marker - clean UI without fake location
+    
+    console.log('📊 Total markers in array:', markers.length);
+    return markers;
+  }, [routeData, tripStatus, busLat, busLng, studentLat, studentLng]);
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -299,67 +377,17 @@ function MapScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#E3F2FD" />
 
-      <MapView
+      <OpenStreetMapView
         ref={mapRef}
         style={styles.map}
-        provider={PROVIDER_GOOGLE}
         initialRegion={initialRegion}
-        showsUserLocation={false}
-        showsMyLocationButton={false}
+        markers={mapMarkers}
+        polyline={polylineCoords}
         onMapReady={() => {
           mapReadyRef.current = true;
-          console.log('✅ Map loaded successfully');
         }}
-        onError={(error) => {
-          console.error('❌ Map error:', error);
-          setMapError(true);
-        }}
-        loadingEnabled={true}
-        loadingIndicatorColor="#2981f3ff"
-        loadingBackgroundColor="#ffffff"
-      >
-        {polylineCoords.length > 0 && (
-          <Polyline
-            coordinates={polylineCoords}
-            strokeColor="#2981f3ff"
-            strokeWidth={4}
-          />
-        )}
-
-        <RouteStopMarkers stops={routeData.stops} />
-
-        {/* Only show bus marker when trip is ON_ROUTE and location is available */}
-        {tripStatus === 'ON_ROUTE' && busLocation && (
-          busAnimatedCoordRef?.current ? (
-            <BusMarker coordinate={busAnimatedCoordRef.current} />
-          ) : (
-            <Marker
-              coordinate={busLocation}
-              anchor={{ x: 0.5, y: 0.5 }}
-              title="Bus"
-              description="Live Location"
-            >
-              <View style={{
-                width: 40,
-                height: 40,
-                borderRadius: 40,
-                backgroundColor: '#2981f3ff',
-                justifyContent: 'center',
-                alignItems: 'center',
-                borderWidth: 3,
-                borderColor: '#fff',
-                elevation: 6,
-              }}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>BUS</Text>
-              </View>
-            </Marker>
-          )
-        )}
-
-        {studentAnimatedCoordRef?.current && (
-          <StudentMarker coordinate={studentAnimatedCoordRef.current} />
-        )}
-      </MapView>
+        mapRef={mapRef}
+      />
 
       <MapHeader
         routeName={routeData.routeName}
@@ -379,13 +407,10 @@ function MapScreen() {
         stopsAway={stopsAway}
         visible={tripStatus === 'ON_ROUTE'}
       />
+
+      {/* Network Status Alert */}
+      <NetworkAlert isOnline={isOnline} />
       
-      <ErrorModal
-        visible={errorModalVisible}
-        title={errorTitle}
-        message={errorMessage}
-        onClose={() => setErrorModalVisible(false)}
-      />
     </View>
   );
 }
@@ -407,6 +432,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#757575',
+  },
+  gpsLoadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#9e9e9e',
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
 });
 

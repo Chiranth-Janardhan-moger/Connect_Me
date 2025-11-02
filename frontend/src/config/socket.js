@@ -173,13 +173,18 @@ export const joinBusRoom = (routeNumber, studentId) => {
     if (socket) {
       socket.connect();
       // Use routeNumber as busId since student's route = bus route
-      socket.emit('student:join', { busId: routeNumber, studentId });
-      console.log('📍 Joined bus room (Route):', routeNumber);
+      const joinData = { busId: routeNumber, studentId };
+      console.log('📍 Emitting student:join with data:', JSON.stringify(joinData));
+      socket.emit('student:join', joinData);
+      console.log('✅ Joined bus room (Route):', routeNumber, 'Student:', studentId);
+      
+      // Also log socket connection status
+      console.log('🔌 Socket connected:', socket.connected, 'Socket ID:', socket.id);
     } else {
-      console.warn('Socket not available for joining bus room');
+      console.warn('⚠️ Socket not available for joining bus room');
     }
   } catch (error) {
-    console.error('Failed to join bus room:', error);
+    console.error('❌ Failed to join bus room:', error);
   }
 };
 
@@ -192,16 +197,22 @@ export const listenToLocationUpdates = (callback) => {
       // Do NOT listen to global 'driver:location-update' events
       const event = 'student:location-update';
       
+      console.log('👂 Setting up listener for:', event);
+      
       if (currentLocationUpdateHandler) {
         try { socket.off(event, currentLocationUpdateHandler); } catch (_) {}
       }
-      currentLocationUpdateHandler = callback;
+      currentLocationUpdateHandler = (data) => {
+        console.log('📡 Received event:', event, 'data:', data);
+        callback(data);
+      };
       socket.on(event, currentLocationUpdateHandler);
+      console.log('✅ Listener attached for:', event);
     } else {
-      console.warn('Socket not available for location updates');
+      console.warn('⚠️ Socket not available for location updates');
     }
   } catch (error) {
-    console.error('Failed to listen to location updates:', error);
+    console.error('❌ Failed to listen to location updates:', error);
   }
 };
 

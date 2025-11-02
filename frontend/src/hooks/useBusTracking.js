@@ -1,8 +1,8 @@
 // hooks/useBusTracking.js
-import { useState, useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
-import { AnimatedRegion } from 'react-native-maps';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { busAPI } from '../config/api';
+import { calculateDistance } from '../services/locationService';
+import { showSuccessAlert, showErrorAlert } from '../../app/components/CustomAlert';
 import { studentAPI } from '../config/api';
 import {
   joinBusRoom,
@@ -36,11 +36,15 @@ export const useBusTracking = () => {
       setError(null);
 
       const response = await studentAPI.getLiveLocation();
+      console.log('📡 API Response:', response);
 
       if (response.ok && response.data) {
         // Backend returns { locationAvailable, location: { latitude, longitude } }
         const { locationAvailable, location, status } = response.data;
+        console.log('🚌 Trip status:', status, 'Location available:', locationAvailable, 'Location:', location);
+        
         if (status === 'ON_ROUTE' && locationAvailable && location) {
+          console.log('✅ Bus is ON_ROUTE with location');
           setTripStatus('ON_ROUTE');
 
           // Support payloads with latitude/longitude or lat/lng, and string numbers
@@ -62,14 +66,15 @@ export const useBusTracking = () => {
           lastBusUpdateAtRef.current = Date.now();
 
           if (!busAnimatedCoord.current) {
-            busAnimatedCoord.current = new AnimatedRegion({
+            busAnimatedCoord.current = {
               latitude: newLocation.latitude,
               longitude: newLocation.longitude,
-              latitudeDelta: 0.005,
-              longitudeDelta: 0.005,
-            });
+            };
           } else {
-            busAnimatedCoord.current.setValue(newLocation);
+            busAnimatedCoord.current = {
+              latitude: newLocation.latitude,
+              longitude: newLocation.longitude,
+            };
           }
 
           try {
@@ -82,6 +87,7 @@ export const useBusTracking = () => {
         }
         // If no live location yet but trip is ON_ROUTE
         if (status === 'ON_ROUTE' && !locationAvailable) {
+          console.log('⏳ Trip is ON_ROUTE but driver hasn\'t sent location yet');
           setTripStatus('ON_ROUTE');
           // Clear stale location if bus hasn't sent location yet
           setBusLocation(null);
@@ -139,15 +145,22 @@ export const useBusTracking = () => {
         return;
       }
 
+      console.log('🔌 Joining bus room with:');
+      console.log('   - Route Number:', user.routeNumber);
+      console.log('   - Student ID:', user._id);
+      console.log('   - User data:', JSON.stringify(user));
+      
       joinBusRoom(user.routeNumber, user._id);
       setIsConnected(true);
+      console.log('✅ Socket connection established and room joined');
 
       listenToLocationUpdates((data) => {
         try {
+          console.log('🚌 Received bus location update:', data);
           const latVal = data?.latitude ?? data?.lat;
           const lngVal = data?.longitude ?? data?.lng;
           if (latVal == null || lngVal == null) {
-            console.warn('Invalid location data received');
+            console.warn('⚠️ Invalid location data received:', data);
             return;
           }
 
@@ -158,32 +171,26 @@ export const useBusTracking = () => {
 
           // Validate coordinates
           if (isNaN(newLocation.latitude) || isNaN(newLocation.longitude)) {
-            console.warn('Invalid coordinate values in location update');
+            console.warn('⚠️ Invalid coordinate values in location update');
             return;
           }
 
           // If we receive location via socket, trip must be ON_ROUTE
+          console.log('✅ Setting bus location:', newLocation);
           setTripStatus('ON_ROUTE');
           setBusLocation(newLocation);
-          if (__DEV__) {
-            try { console.log('💡 Bus update via socket:', newLocation); } catch (_) {}
-          }
           lastBusUpdateAtRef.current = Date.now();
 
           if (!busAnimatedCoord.current) {
-            busAnimatedCoord.current = new AnimatedRegion({
+            busAnimatedCoord.current = {
               latitude: newLocation.latitude,
               longitude: newLocation.longitude,
-              latitudeDelta: 0.005,
-              longitudeDelta: 0.005,
-            });
+            };
           } else {
-            busAnimatedCoord.current.timing({
+            busAnimatedCoord.current = {
               latitude: newLocation.latitude,
               longitude: newLocation.longitude,
-              duration: 1000,
-              useNativeDriver: false,
-            }).start();
+            };
           }
         } catch (updateError) {
           console.error('Error processing location update:', updateError);
@@ -192,12 +199,12 @@ export const useBusTracking = () => {
 
       listenToBusReached(() => {
         try {
-          Alert.alert('Trip Completed', 'The bus has reached!', [
-            { text: 'OK', onPress: () => {
-              setTripStatus('REACHED');
-              disconnect();
-            }}
-          ]);
+          showSuccessAlert(
+            '🚌 Trip Completed',
+            'The bus has reached its destination! Thank you for using BMS Connect.'
+          );
+          setTripStatus('REACHED');
+          disconnect();
         } catch (alertError) {
           console.error('Error showing bus reached alert:', alertError);
           // Still update status even if alert fails

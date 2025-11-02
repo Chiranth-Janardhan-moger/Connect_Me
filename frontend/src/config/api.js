@@ -2,10 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // Production backend (uses HTTPS)
-const PRODUCTION_URL = 'https://connect-me-8hc8.onrender.com';
-
+// const PRODUCTION_URL = '';
+ const PRODUCTION_URL = 'https://connect-me-8hc8.onrender.com';
 // Local development IP (uses HTTP - no SSL certificate)
-const LOCAL_DEV_IP = '192.168.1.103:5000';
+const LOCAL_DEV_IP = 'https://connect-me-8hc8.onrender.com';
 
 // Auto-detect: Use HTTPS for domains, HTTP for local IPs
 const isLocalIP = (url) => {
@@ -27,8 +27,8 @@ const normalizeUrl = (url) => {
   return isLocalIP(testUrl) ? `http://${url}` : testUrl;
 };
 
-// Default to local dev IP (will auto-detect protocol)
-const DEFAULT_CLOUD_URL = normalizeUrl(LOCAL_DEV_IP);
+// Default to production URL
+const DEFAULT_CLOUD_URL = PRODUCTION_URL;
 
 const getEnvBaseUrl = () => {
   // Prefer Expo public env

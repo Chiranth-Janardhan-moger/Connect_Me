@@ -10,16 +10,15 @@ import {
   ScrollView,
   Image,
   Modal,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import ErrorModal from '../src/components/ErrorModal';
-import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import ErrorModal from './components/ErrorModal';
 import { preloadMapData } from '../src/services/mapPreload';
+import { showConfirmAlert, showErrorAlert, showSuccessAlert } from './components/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -127,44 +126,37 @@ const Home = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert(
+    showConfirmAlert(
       'Logout',
-      'Are you sure you want to logout?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('🚪 Logging out...');
-              
-              // Clear all session data
-              await AsyncStorage.multiRemove([
-                'authToken',
-                'user',
-                'userRole',
-              ]);
-              
-              console.log('✅ Session cleared');
-              
-              // Close modal
-              setShowProfileModal(false);
-              
-              // Navigate to login
-              router.replace('/Login');
-            } catch (error) {
-              console.error('❌ Logout error:', error);
-              setErrorTitle('Error');
-              setErrorMessage('Failed to logout. Please try again.');
-              setErrorModalVisible(true);
-            }
-          },
-        },
-      ]
+      'Are you sure you want to logout from BMS Connect?',
+      async () => {
+        try {
+          console.log('Logging out...');
+          
+          // Clear all session data
+          await AsyncStorage.multiRemove([
+            'authToken',
+            'user',
+            'userRole',
+            'driver_trip_active',
+            'driver_route_number',
+            'student_last_route'
+          ]);
+          
+          showSuccessAlert('Logged Out', 'You have been successfully logged out.');
+          
+          // Navigate to login after a short delay
+          setTimeout(() => {
+            router.replace('/Login');
+          }, 1000);
+        } catch (error) {
+          console.error('Logout error:', error);
+          showErrorAlert('Logout Failed', 'Failed to logout. Please try again.');
+        }
+      },
+      () => {
+        console.log('Logout cancelled');
+      }
     );
   };
 
@@ -246,13 +238,6 @@ const Home = () => {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8F9FA" />
-      {/* Hidden MapView to warm up Google renderer */}
-      <MapView
-        provider={PROVIDER_GOOGLE}
-        style={{ position: 'absolute', width: 1, height: 1, left: -1000, top: -1000 }}
-        initialRegion={{ latitude: 12.9716, longitude: 77.5946, latitudeDelta: 0.15, longitudeDelta: 0.15 }}
-        pointerEvents="none"
-      />
       
       <View style={styles.backgroundGradient}>
         <ScrollView

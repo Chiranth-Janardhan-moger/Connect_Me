@@ -1,6 +1,7 @@
-// services/locationService.js - FIXED GPS ACCURACY
-import * as Location from 'expo-location';
-import { Platform, Alert } from 'react-native';
+// services/locationService.js - NATIVE GPS ACCURACY
+import Geolocation from '@react-native-community/geolocation';
+import { PermissionsAndroid, Platform } from 'react-native';
+import { showWarningAlert } from '../../app/components/CustomAlert';
 
 // Kalman filter for smoothing GPS coordinates
 class KalmanFilter {
@@ -37,32 +38,33 @@ let locationFilter = null;
 
 export const requestLocationPermission = async () => {
   try {
-    const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-    
-    if (existingStatus === 'granted') {
-      console.log('Location permission already granted');
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: 'Location Access Required',
+          message: 'BMS Connect needs access to your location to track the bus in real-time.',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        },
+      );
+
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        console.log('✅ Android location permission granted');
+        return true;
+      } else {
+        console.log('❌ Android location permission denied');
+        showWarningAlert(
+          '📍 Location Permission Required',
+          'This app needs location access to show your position and track the bus.\n\nPlease grant location permission to continue using the app.'
+        );
+        return false;
+      }
+    } else {
+      // iOS - location permissions are handled differently
       return true;
     }
-
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    
-    if (status !== 'granted') {
-      Alert.alert(
-        'Location Permission Required',
-        'This app needs location access to show your position and track the bus.',
-        [{ text: 'OK' }]
-      );
-      return false;
-    }
-
-    if (Platform.OS === 'android') {
-      const { status: bgStatus } = await Location.getBackgroundPermissionsAsync();
-      if (bgStatus !== 'granted') {
-        await Location.requestBackgroundPermissionsAsync();
-      }
-    }
-
-    return true;
   } catch (error) {
     console.error('Permission error:', error);
     return false;
@@ -70,115 +72,92 @@ export const requestLocationPermission = async () => {
 };
 
 export const getCurrentLocation = async () => {
-  try {
-    const hasPermission = await requestLocationPermission();
-    if (!hasPermission) {
-      console.warn('Location permission not granted, using fallback');
-      return getFallbackLocation();
-    }
+  return new Promise(async (resolve, reject) => {
+    try {
+      const hasPermission = await requestLocationPermission();
+      if (!hasPermission) {
+        reject(new Error('Location permission denied'));
+        return;
+      }
 
-    const readings = [];
-    let lastKnownLocation = null;
-    
-    for (let i = 0; i < 3; i++) {
-      try {
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation,
-          maximumAge: 10000, // Increased from 5000
-          timeout: 15000, // Increased from 10000
-        });
-        
-        if (location && location.coords) {
-          lastKnownLocation = {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy,
+      console.log('📍 Getting current location with native GPS...');
+      console.log('⏳ Please wait 30-60 seconds for initial GPS lock...');
+      
+      // Use React Native's native Geolocation API
+      Geolocation.getCurrentPosition(
+        (position) => {
+          console.log('✅ GPS Location received:', position.coords.latitude.toFixed(6), position.coords.longitude.toFixed(6));
+          console.log('📊 GPS Accuracy:', Math.round(position.coords.accuracy), 'm');
+          
+          const { latitude, longitude, accuracy } = position.coords;
+          
+          // Initialize Kalman filter for smoothing
+          if (!locationFilter) {
+            locationFilter = new KalmanFilter(5);
+          }
+
+          const filtered = locationFilter.process(
+            latitude,
+            longitude,
+            accuracy,
+            Date.now()
+          );
+
+          const result = {
+            latitude: filtered.latitude,
+            longitude: filtered.longitude,
+            accuracy: accuracy,
           };
           
-          // Accept readings with accuracy up to 100m (increased from 50m)
-          if (location.coords.accuracy <= 100) {
-            readings.push(lastKnownLocation);
+          console.log('🎯 Returning filtered location:', result.latitude.toFixed(6), result.longitude.toFixed(6));
+          resolve(result);
+        },
+        (error) => {
+          console.error('❌ GPS Error:', error.message);
+          
+          // Provide helpful error message
+          let helpfulError;
+          if (error.code === 1) { // PERMISSION_DENIED
+            helpfulError = new Error('Location permission denied. Please grant location access in app settings.');
+          } else if (error.code === 2) { // POSITION_UNAVAILABLE
+            helpfulError = new Error('GPS is unavailable. Please check your GPS settings and try again.');
+          } else if (error.code === 3) { // TIMEOUT
+            helpfulError = new Error('GPS is taking too long. Please go outdoors or near a window and try again.');
+          } else {
+            helpfulError = new Error('Unable to get GPS location. Please check your GPS settings and try again.');
           }
+          
+          reject(helpfulError);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 60000, // 60 seconds for initial fix
+          maximumAge: 10000, // Allow 10s old location
         }
-        
-        if (i < 2) await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (locationError) {
-        console.warn(`Location attempt ${i + 1} failed:`, locationError.message);
-        // Continue trying other attempts
-      }
+      );
+    } catch (error) {
+      console.error('❌ Location service error:', error);
+      reject(error);
     }
-
-    // If we have any readings, use them
-    if (readings.length > 0) {
-      const avgLat = readings.reduce((sum, r) => sum + r.latitude, 0) / readings.length;
-      const avgLng = readings.reduce((sum, r) => sum + r.longitude, 0) / readings.length;
-      const avgAcc = readings.reduce((sum, r) => sum + r.accuracy, 0) / readings.length;
-
-      if (!locationFilter) {
-        locationFilter = new KalmanFilter(20); // Increased from 10
-      }
-
-      const filtered = locationFilter.process(avgLat, avgLng, avgAcc, Date.now());
-
-      return {
-        latitude: filtered.latitude,
-        longitude: filtered.longitude,
-        accuracy: avgAcc,
-      };
-    }
-    
-    // If we have a last known location, use it even if inaccurate
-    if (lastKnownLocation) {
-      console.warn('Using last known location with reduced accuracy');
-      return {
-        latitude: lastKnownLocation.latitude,
-        longitude: lastKnownLocation.longitude,
-        accuracy: lastKnownLocation.accuracy,
-      };
-    }
-
-    // Final fallback
-    console.warn('No location available, using fallback location');
-    return getFallbackLocation();
-  } catch (error) {
-    console.error('Get location error:', error);
-    console.warn('Using fallback location due to error');
-    return getFallbackLocation();
-  }
+  });
 };
 
-// Fallback location (can be set to a default location for your area)
-const getFallbackLocation = () => {
-  // Default to Bangalore coordinates as fallback
-  return {
-    latitude: 12.9716,
-    longitude: 77.5946,
-    accuracy: 1000, // Indicate this is not accurate
-  };
-};
+// NO FALLBACK LOCATION - Always use real GPS data
 
 export const watchPosition = async (callback) => {
   try {
     const hasPermission = await requestLocationPermission();
     if (!hasPermission) {
-      console.warn('Location permission not granted, using fallback tracking');
-      // Return a mock subscription that provides fallback location
-      return {
-        remove: () => {},
-        _isFallback: true,
-      };
+      throw new Error('Location permission not granted');
     }
 
     if (!locationFilter) {
       locationFilter = new KalmanFilter(20);
     }
 
-    const subscription = await Location.watchPositionAsync(
-      {
-        accuracy: Location.Accuracy.BestForNavigation,
-        timeInterval: 5000, // Increased from 3000
-        distanceInterval: 10, // Increased from 5
-      },
+    console.log('👀 Starting native location watcher with high accuracy...');
+    
+    const watchId = Geolocation.watchPosition(
       (position) => {
         try {
           if (!position || !position.coords) {
@@ -188,11 +167,13 @@ export const watchPosition = async (callback) => {
 
           const { latitude, longitude, accuracy } = position.coords;
           
-          // Accept readings up to 200m accuracy (increased from 100m)
+          // Only filter extremely inaccurate readings (GPS error)
           if (accuracy > 200) {
-            console.log('Ignoring inaccurate reading:', accuracy);
+            console.log('⚠️ Ignoring inaccurate reading:', Math.round(accuracy), 'm');
             return;
           }
+          
+          console.log('📍 GPS Update - Accuracy:', Math.round(accuracy), 'm', 'Lat:', latitude.toFixed(5), 'Lng:', longitude.toFixed(5));
 
           const filtered = locationFilter.process(
             latitude,
@@ -212,18 +193,32 @@ export const watchPosition = async (callback) => {
         } catch (callbackError) {
           console.error('Error in location callback:', callbackError);
         }
+      },
+      (error) => {
+        console.error('❌ Watch position error:', error.message);
+        // Don't throw - just log and continue
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 1000,
+        distanceFilter: 0, // Update on any movement
+        interval: 1000, // Update every 1 second
       }
     );
 
-    return subscription;
-  } catch (error) {
-    console.error('Watch position error:', error);
-    // Return a fallback subscription instead of throwing
-    console.warn('Using fallback location tracking due to error');
+    // Return subscription-like object
     return {
-      remove: () => {},
-      _isFallback: true,
+      remove: () => {
+        if (watchId !== null) {
+          Geolocation.clearWatch(watchId);
+          console.log('🛑 Location watcher stopped');
+        }
+      },
     };
+  } catch (error) {
+    console.error('❌ Watch position error:', error);
+    throw error;
   }
 };
 

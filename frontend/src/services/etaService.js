@@ -1,4 +1,4 @@
-// services/etaService.js - FREE APIs + SMART ALGORITHM
+// services/etaService.js - PURE MATH ETA CALCULATION
 import { calculateDistance } from './locationService';
 
 const getTrafficFactor = () => {
@@ -56,99 +56,6 @@ const calculateSmartETA = (distance, routeStops, busLocation, studentLocation) =
   };
 };
 
-const fetchOpenRouteServiceETA = async (origin, destination) => {
-  try {
-    const apiKey = process.env.EXPO_PUBLIC_OPENROUTE_API_KEY;
-    if (!apiKey) throw new Error('No API key');
-
-    const url = `https://api.openrouteservice.org/v2/directions/driving-car?api_key=${apiKey}&start=${origin.longitude},${origin.latitude}&end=${destination.longitude},${destination.latitude}`;
-
-    const response = await fetch(url, { timeout: 5000 });
-    if (!response.ok) throw new Error('API request failed');
-
-    const data = await response.json();
-
-    if (data.features && data.features[0]) {
-      const route = data.features[0].properties.segments[0];
-      const duration = route.duration;
-      const distance = route.distance;
-      const minutes = Math.round(duration / 60);
-      
-      return {
-        etaText: minutes < 1 ? 'Less than 1 min' : `${minutes} mins`,
-        distanceText: `${(distance / 1000).toFixed(1)} km`,
-      };
-    }
-
-    throw new Error('Invalid response');
-  } catch (error) {
-    console.log('OpenRouteService error:', error.message);
-    throw error;
-  }
-};
-
-const fetchMapBoxETA = async (origin, destination) => {
-  try {
-    const apiKey = process.env.EXPO_PUBLIC_MAPBOX_API_KEY;
-    if (!apiKey) throw new Error('No API key');
-
-    const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?access_token=${apiKey}&geometries=geojson`;
-
-    const response = await fetch(url, { timeout: 5000 });
-    if (!response.ok) throw new Error('API request failed');
-
-    const data = await response.json();
-
-    if (data.routes && data.routes[0]) {
-      const route = data.routes[0];
-      const duration = route.duration;
-      const distance = route.distance;
-      const minutes = Math.round(duration / 60);
-      
-      return {
-        etaText: minutes < 1 ? 'Less than 1 min' : `${minutes} mins`,
-        distanceText: `${(distance / 1000).toFixed(1)} km`,
-      };
-    }
-
-    throw new Error('Invalid response');
-  } catch (error) {
-    console.log('MapBox error:', error.message);
-    throw error;
-  }
-};
-
-const fetchTomTomETA = async (origin, destination) => {
-  try {
-    const apiKey = process.env.EXPO_PUBLIC_TOMTOM_API_KEY;
-    if (!apiKey) throw new Error('No API key');
-
-    const url = `https://api.tomtom.com/routing/1/calculateRoute/${origin.latitude},${origin.longitude}:${destination.latitude},${destination.longitude}/json?key=${apiKey}&traffic=true`;
-
-    const response = await fetch(url, { timeout: 5000 });
-    if (!response.ok) throw new Error('API request failed');
-
-    const data = await response.json();
-
-    if (data.routes && data.routes[0]) {
-      const route = data.routes[0].summary;
-      const duration = route.travelTimeInSeconds;
-      const distance = route.lengthInMeters;
-      const minutes = Math.round(duration / 60);
-      
-      return {
-        etaText: minutes < 1 ? 'Less than 1 min' : `${minutes} mins`,
-        distanceText: `${(distance / 1000).toFixed(1)} km`,
-      };
-    }
-
-    throw new Error('Invalid response');
-  } catch (error) {
-    console.log('TomTom error:', error.message);
-    throw error;
-  }
-};
-
 export const fetchETA = async (origin, destination, routeStops = null) => {
   try {
     if (!origin || !destination) {
@@ -187,38 +94,8 @@ export const fetchETA = async (origin, destination, routeStops = null) => {
       };
     }
 
-    // Try OpenRouteService
-    try {
-      console.log('Trying OpenRouteService...');
-      const result = await fetchOpenRouteServiceETA(origin, destination);
-      console.log('✅ OpenRouteService success');
-      return { ...result, stopsAway: 0 };
-    } catch (error) {
-      console.log('OpenRouteService not available:', error.message);
-    }
-
-    // Try MapBox
-    try {
-      console.log('Trying MapBox...');
-      const result = await fetchMapBoxETA(origin, destination);
-      console.log('✅ MapBox success');
-      return { ...result, stopsAway: 0 };
-    } catch (error) {
-      console.log('MapBox not available:', error.message);
-    }
-
-    // Try TomTom
-    try {
-      console.log('Trying TomTom...');
-      const result = await fetchTomTomETA(origin, destination);
-      console.log('✅ TomTom success');
-      return { ...result, stopsAway: 0 };
-    } catch (error) {
-      console.log('TomTom not available:', error.message);
-    }
-
-    // Fallback to smart algorithm
-    console.log('Using smart algorithm fallback');
+    // Use pure math algorithm for ETA calculation
+    console.log('📐 Calculating ETA using pure math algorithm');
     return calculateSmartETA(distance, routeStops, origin, destination);
     
   } catch (error) {

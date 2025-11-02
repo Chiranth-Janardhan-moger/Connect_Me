@@ -1,7 +1,6 @@
-// hooks/useLocation.js - IMPROVED ACCURACY
+// hooks/useLocation.js - NATIVE GPS ACCURACY
 import { useState, useEffect, useRef } from 'react';
-import { Alert } from 'react-native';
-import { AnimatedRegion } from 'react-native-maps';
+import { Alert, Platform } from 'react-native';
 import { 
   getCurrentLocation, 
   watchPosition, 
@@ -22,53 +21,33 @@ export const useLocation = () => {
   const initLocation = async () => {
     try {
       setError(null);
-      console.log('Initializing location...');
+      console.log('🛰️ Initializing GPS with high accuracy...');
       
       const currentLocation = await getCurrentLocation();
       
       if (!currentLocation) {
-        console.warn('No location returned, using fallback');
-        const fallbackLocation = {
-          latitude: 12.9716,
-          longitude: 77.5946,
-          accuracy: 1000,
-        };
-        setLocation(fallbackLocation);
-        return fallbackLocation;
+        throw new Error('No location data received');
       }
 
-      console.log('Initial accuracy:', currentLocation.accuracy, 'meters');
+      console.log('✅ Initial GPS lock - Accuracy:', Math.round(currentLocation.accuracy), 'meters');
       setLocation(currentLocation);
 
-      if (!animatedCoord.current) {
-        animatedCoord.current = new AnimatedRegion({
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        });
-      } else {
-        animatedCoord.current.setValue({
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-        });
-      }
+      animatedCoord.current = {
+        latitude: currentLocation.latitude,
+        longitude: currentLocation.longitude,
+      };
 
       recentLocations.current = [currentLocation];
       return currentLocation;
     } catch (err) {
-      console.error('Location init error:', err);
+      console.error('❌ GPS initialization failed:', err.message);
+      
+      // Set error state for UI to display
       setError(err.message);
       
-      // Don't show alert for location errors, just use fallback
-      console.warn('Using fallback location due to error');
-      const fallbackLocation = {
-        latitude: 12.9716,
-        longitude: 77.5946,
-        accuracy: 1000,
-      };
-      setLocation(fallbackLocation);
-      return fallbackLocation;
+      // NO FALLBACK LOCATION - Let UI handle the error gracefully
+      console.log('📍 GPS not available - UI will show error state');
+      return null;
     }
   };
 
@@ -76,6 +55,9 @@ export const useLocation = () => {
     if (isTracking) return;
 
     try {
+      // Start tracking directly - native API will handle GPS checks
+      console.log('🚀 Starting native GPS tracking...');
+
       console.log('Starting location tracking...');
       setIsTracking(true);
 
@@ -86,61 +68,32 @@ export const useLocation = () => {
             return;
           }
 
-          const now = Date.now();
-          const timeDelta = now - lastUpdateTime.current;
           const { latitude, longitude, accuracy } = position.coords;
 
-          if (__DEV__) {
-            console.log('GPS - Accuracy:', Math.round(accuracy), 'm');
+          // Only filter extremely inaccurate readings (GPS error)
+          if (accuracy > 200) {
+            console.log('⚠️ Ignoring inaccurate reading:', Math.round(accuracy), 'm');
+            return;
           }
-
-          // More lenient conditions for indoor/less accurate GPS
-          if (timeDelta < 2000 || accuracy > 200) return;
 
           const newLocation = { latitude, longitude, accuracy };
-
-          if (location) {
-            const distance = calculateDistance(
-              location.latitude,
-              location.longitude,
-              newLocation.latitude,
-              newLocation.longitude
-            );
-
-            recentLocations.current.push(newLocation);
-            if (recentLocations.current.length > 5) {
-              recentLocations.current.shift();
-            }
-
-            const stationary = isStationary(recentLocations.current, 25); // Increased from 15
-            
-            if (stationary && distance < 25) { // Increased from 15
-              console.log('Filtering GPS drift');
-              return;
-            }
-
-            if (distance < 15) return; // Increased from 8
-            
-            console.log('✅ Movement:', Math.round(distance), 'm');
-          }
-
-          lastUpdateTime.current = now;
+          
+          // Update location EVERY TIME for smooth, fluid movement
           setLocation(newLocation);
+          
+          console.log('📍 GPS Update:', latitude.toFixed(6), longitude.toFixed(6), '| Acc:', Math.round(accuracy), 'm');
+          console.log('✅ Location state updated in hook');
 
           if (!animatedCoord.current) {
-            animatedCoord.current = new AnimatedRegion({
+            animatedCoord.current = {
               latitude: newLocation.latitude,
               longitude: newLocation.longitude,
-              latitudeDelta: 0.005,
-              longitudeDelta: 0.005,
-            });
+            };
           } else {
-            animatedCoord.current.timing({
+            animatedCoord.current = {
               latitude: newLocation.latitude,
               longitude: newLocation.longitude,
-              duration: 2000,
-              useNativeDriver: false,
-            }).start();
+            };
           }
         } catch (callbackError) {
           console.error('Error in tracking callback:', callbackError);
@@ -153,8 +106,8 @@ export const useLocation = () => {
       setIsTracking(false);
       setError(err.message);
       
-      // Don't show alert, just log the error and continue
-      console.warn('Location tracking failed, continuing without live updates');
+      // NO FALLBACK - Let UI handle the error
+      console.warn('Location tracking failed, UI will show error state');
     }
   };
 
@@ -174,14 +127,18 @@ export const useLocation = () => {
   const ensureAnimatedFromLocation = (loc) => {
     if (!loc) return;
     if (!animatedCoord.current) {
-      animatedCoord.current = new AnimatedRegion({
+      animatedCoord.current = {
         latitude: loc.latitude,
         longitude: loc.longitude,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      });
+      };
     }
   };
+
+  // Debug: Log state changes
+  console.log('🔄 useLocation state update:');
+  console.log('  - location:', location ? `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}` : 'null');
+  console.log('  - error:', error);
+  console.log('  - isTracking:', isTracking);
 
   return {
     location,

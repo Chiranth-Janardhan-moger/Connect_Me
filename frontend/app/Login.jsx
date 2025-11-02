@@ -17,8 +17,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authAPI } from '../src/config/api';  // Import API
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import ErrorModal from '../src/components/ErrorModal';
 import { preloadMapData } from '../src/services/mapPreload';
+import ErrorModal from './components/ErrorModal';
 
 export default function LoginScreen() {
   const router = useRouter();

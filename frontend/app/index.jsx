@@ -1,4 +1,5 @@
-// app/index.js (or your main splash screen file)
+// app/index.js
+
 import { View, Text, StyleSheet, StatusBar } from 'react-native';
 import LottieView from 'lottie-react-native';
 import { useRouter } from 'expo-router';
@@ -7,14 +8,17 @@ import { useEffect, useRef, useState } from 'react';
 
 export default function SplashScreen() {
   const router = useRouter();
-  
+
   // State to track if each task is finished
   const [authFinished, setAuthFinished] = useState(false);
   const [animationFinished, setAnimationFinished] = useState(false);
-  
+
   // State to store the destination
   const [targetRoute, setTargetRoute] = useState(null);
-  
+
+  // State to control the animation speed (default: 1x)
+  const [animationSpeed, setAnimationSpeed] = useState(1);
+
   // Ref to prevent auth check from running multiple times
   const authCheckDone = useRef(false);
 
@@ -23,65 +27,81 @@ export default function SplashScreen() {
     const checkAuth = async () => {
       if (authCheckDone.current) return;
       authCheckDone.current = true;
+
       try {
         const token = await AsyncStorage.getItem('authToken');
         const userRole = await AsyncStorage.getItem('userRole');
+
         console.log('🔑 Token exists:', !!token);
         console.log('👤 User role:', userRole);
 
         let route = '/Login';
+
         if (token && userRole) {
+          // Returning user → Speed up animation
+          console.log('🚀 Returning user. Speeding up animation!');
+          setAnimationSpeed(2.5);
+
           switch (userRole) {
-            case 'student': route = '/Student'; break;
-            case 'driver': route = '/Driver'; break;
-            case 'admin': route = '/Admin'; break;
-            default: route = '/Login';
+            case 'student':
+              route = '/Student';
+              break;
+            case 'driver':
+              route = '/Driver';
+              break;
+            case 'admin':
+              route = '/Admin';
+              break;
+            default:
+              route = '/Login';
           }
+        } else {
+          // New user → Normal speed
+          console.log('👋 New user. Playing animation at normal speed.');
+          setAnimationSpeed(1);
+          route = '/Login';
         }
-        
+
         console.log('📍 Target route determined:', route);
-        setTargetRoute(route); // Save the route
+        setTargetRoute(route);
       } catch (error) {
         console.error('❌ Auth check error:', error);
-        setTargetRoute('/Login'); // Default to Login on error
+        setAnimationSpeed(1);
+        setTargetRoute('/Login');
       } finally {
         console.log('✅ Auth check finished.');
-        setAuthFinished(true); // Mark auth as finished
+        setAuthFinished(true);
       }
     };
 
     checkAuth();
   }, []);
 
-  // 2. This function runs when the animation completes
+  // 2. Function runs when animation completes
   const handleAnimationFinish = () => {
     console.log('🎬 Animation finished!');
-    setAnimationFinished(true); // Mark animation as finished
+    setAnimationFinished(true);
   };
 
-  // 3. This 'useEffect' watches for BOTH tasks to be complete
+  // 3. Watch for BOTH tasks to complete before navigating
   useEffect(() => {
-    // If auth is not finished OR animation is not finished OR we don't have a route yet, do nothing.
-    if (!authFinished || !animationFinished || !targetRoute) {
-      return;
-    }
+    if (!authFinished || !animationFinished || !targetRoute) return;
 
-    // --- Both are finished! Time to navigate. ---
     console.log(`🚀 Navigating to: ${targetRoute}`);
     router.replace(targetRoute);
+  }, [authFinished, animationFinished, targetRoute, router]);
 
-  }, [authFinished, animationFinished, targetRoute, router]); // Re-run when any of these change
-
-  // --- Render the component ---
+  // --- Render ---
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <LottieView
         source={require('../assets/json/Bus-Loading.json')}
         autoPlay
-        loop={false} // <-- This is what you wanted
+        loop={false}
         style={styles.lottie}
-        onAnimationFinish={handleAnimationFinish} // <-- Triggers when done
+        onAnimationFinish={handleAnimationFinish}
+        speed={animationSpeed}
       />
       <View style={styles.bottomTextContainer}>
         <Text style={styles.text}>Developed by</Text>
@@ -91,7 +111,7 @@ export default function SplashScreen() {
   );
 }
 
-// (Your styles remain the same)
+// --- Styles ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,

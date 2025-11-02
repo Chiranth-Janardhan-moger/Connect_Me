@@ -2,8 +2,9 @@
 // Catches any remaining crashes and shows a friendly error screen
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { showErrorAlert, showWarningAlert } from './CustomAlert';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -31,29 +32,43 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) {
       return (
         <View style={styles.container}>
-          <Ionicons name="alert-circle" size={64} color="#F44336" />
+          {/* Icon with circular background */}
+          <View style={styles.iconContainer}>
+            <Ionicons name="alert-circle" size={64} color="#ef4444" />
+          </View>
+          
+          {/* Title */}
           <Text style={styles.title}>Oops! Something went wrong</Text>
+          
+          {/* Message */}
           <Text style={styles.message}>
-            The map encountered an unexpected error. Please try again.
+            The app encountered an unexpected error. Please try again or contact support if the problem persists.
           </Text>
+          
+          {/* Error details in development */}
           {__DEV__ && this.state.error && (
-            <Text style={styles.errorText}>
-              {this.state.error.toString()}
-            </Text>
-          )}
-          <TouchableOpacity style={styles.button} onPress={this.handleReset}>
-            <Text style={styles.buttonText}>Try Again</Text>
-          </TouchableOpacity>
-          {this.props.onGoBack && (
-            <TouchableOpacity
-              style={[styles.button, styles.secondaryButton]}
-              onPress={this.props.onGoBack}
-            >
-              <Text style={[styles.buttonText, styles.secondaryButtonText]}>
-                Go Back
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorTitle}>Error Details (Dev Mode):</Text>
+              <Text style={styles.errorText}>
+                {this.state.error.toString()}
               </Text>
-            </TouchableOpacity>
+            </View>
           )}
+          
+          {/* Action buttons */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.primaryButton} onPress={this.handleReset}>
+              <Ionicons name="refresh" size={20} color="#fff" style={styles.buttonIcon} />
+              <Text style={styles.primaryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+            
+            {this.props.onGoBack && (
+              <TouchableOpacity style={styles.secondaryButton} onPress={this.props.onGoBack}>
+                <Ionicons name="arrow-back" size={20} color="#2563eb" style={styles.buttonIcon} />
+                <Text style={styles.secondaryButtonText}>Go Back</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       );
     }
@@ -67,54 +82,116 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 24,
+    backgroundColor: '#fefefe',
+    padding: 32,
+  },
+  iconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#fef2f2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+    borderWidth: 3,
+    borderColor: '#fecaca',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   title: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '700',
-    color: '#2C2C2C',
-    marginTop: 16,
+    color: '#111827',
+    marginTop: 8,
+    marginBottom: 12,
+    textAlign: 'center',
+    lineHeight: 34,
+  },
+  message: {
+    fontSize: 17,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 25,
+    paddingHorizontal: 16,
+  },
+  errorContainer: {
+    width: '100%',
+    marginBottom: 32,
+    padding: 16,
+    backgroundColor: '#fef2f2',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  errorTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#991b1b',
     marginBottom: 8,
     textAlign: 'center',
   },
-  message: {
-    fontSize: 16,
-    color: '#757575',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
   errorText: {
     fontSize: 12,
-    color: '#F44336',
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
+    color: '#dc2626',
     fontFamily: 'monospace',
+    textAlign: 'left',
+    lineHeight: 18,
   },
-  button: {
-    backgroundColor: '#2981f3ff',
-    paddingVertical: 14,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    marginTop: 8,
-    minWidth: 200,
+  buttonContainer: {
+    width: '100%',
+    gap: 16,
+    maxWidth: 300,
   },
-  buttonText: {
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563eb',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  primaryButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#2981f3ff',
+    borderColor: '#2563eb',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   secondaryButtonText: {
-    color: '#2981f3ff',
+    color: '#2563eb',
+    fontSize: 17,
+    fontWeight: '600',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
 });
 

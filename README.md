@@ -338,8 +338,8 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for details.
         <sub>Project Lead & Full Stack Developer</sub>
     </td>
     <td align="center">
-        <a href="https://github.com/xxx">
-            <img src="https://github.com/DivyashreG.png" width="100px;" alt="Divyashree"/>
+        <a href="https://github.com/DivyashreeG7">
+            <img src="https://github.com/DivyashreeG7.png" width="100px;" alt="Divyashree"/>
             <br />
             <sub><b>Divyashree G</b></sub>
         </a>

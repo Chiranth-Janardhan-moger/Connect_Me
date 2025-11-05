@@ -1,4 +1,3 @@
-
 import { Router } from 'express';
 import { addStudent, addDriver, addRoute, getAllRoutes, getUsers, deleteUser } from '../controllers/admin.controller';
 import { verifyToken } from '../middlewares/auth.middleware';
@@ -6,7 +5,6 @@ import { requireAdmin } from '../middlewares/role.middleware';
 
 const router = Router();
 
-// All routes in this file are protected and require admin role
 router.use(verifyToken, requireAdmin);
 
 router.post('/add-student', addStudent);

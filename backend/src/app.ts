@@ -7,6 +7,7 @@ import driverRoutes from './api/routes/driver.routes';
 import studentRoutes from './api/routes/student.routes';
 import adminRoutes from './api/routes/admin.routes';
 import notificationRoutes from './api/routes/notification.routes';
+import appVersionRoutes from './api/routes/appVersion.routes';
 
 const app: Application = express();
 
@@ -30,6 +31,7 @@ app.use('/api/driver', driverRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/app', appVersionRoutes);
 
 
 export default app;

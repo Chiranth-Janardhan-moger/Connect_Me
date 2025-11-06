@@ -16,8 +16,8 @@ export interface IUser extends MongooseDocument {
     role: UserRole;
     busId?: Types.ObjectId; // busId is optional for admin
     routeNumber?: number; // route number for students
-    expoPushToken?: string; // Deprecated - keeping for backward compatibility
-    fcmToken?: string; // Firebase Cloud Messaging token
+    expoPushToken?: string; // Expo Push Token for notifications
+    fcmToken?: string; // Deprecated - keeping for backward compatibility
     comparePassword(password: string): Promise<boolean>;
 }
 
@@ -50,8 +50,8 @@ const UserSchema: Schema = new Schema({
             return this.role === UserRole.STUDENT;
         }
     },
-    expoPushToken: { type: String }, // Deprecated - keeping for backward compatibility
-    fcmToken: { type: String } // Firebase Cloud Messaging token
+    expoPushToken: { type: String }, // Expo Push Token for notifications
+    fcmToken: { type: String } // Deprecated - keeping for backward compatibility
 } as any);
 
 UserSchema.pre<IUser>('save', async function (next) {

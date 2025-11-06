@@ -4,18 +4,33 @@ import User, { UserRole } from '../../models/user.model';
  * Save Expo Push Token for a user
  */
 async function saveUserToken(userId: string, token: string) {
-  await User.findByIdAndUpdate(userId, { expoPushToken: token }, { new: true });
-  console.log(`✅ Expo Push Token saved for user: ${userId}`);
+  const user = await User.findByIdAndUpdate(
+    userId, 
+    { expoPushToken: token }, 
+    { new: true }
+  ).select('name email role expoPushToken');
+  
+  if (user) {
+    console.log(`✅ Expo Push Token saved for user: ${user.name} (${user.role}) - Token: ${token.substring(0, 30)}...`);
+  } else {
+    console.warn(`⚠️ User not found for ID: ${userId}`);
+  }
+  
+  return user;
 }
 
 /**
  * Send push notification to users with a specific role using Expo Push Notifications
  */
-async function sendToRole(role: UserRole | 'driver' | 'student', payload: { title: string; body: string }) {
+async function sendToRole(role: UserRole | 'driver' | 'student' | 'admin', payload: { title: string; body: string }) {
   try {
+    console.log(`🔔 Attempting to send notification to role: ${role}`);
+    
     // Get users with Expo Push Tokens
     const users = await User.find({ role, expoPushToken: { $exists: true, $ne: null } }).select('expoPushToken');
     const tokens = users.map((u: any) => u.expoPushToken).filter((t: string) => t && t.length > 0);
+    
+    console.log(`📊 Found ${users.length} users with role '${role}', ${tokens.length} have valid tokens`);
     
     if (tokens.length === 0) {
       console.warn(`⚠️ No Expo Push Tokens found for role: ${role}`);

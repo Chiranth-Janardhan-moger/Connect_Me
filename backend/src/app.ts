@@ -10,6 +10,7 @@ import notificationRoutes from './api/routes/notification.routes';
 import appVersionRoutes from './api/routes/appVersion.routes';
 import chatRoutes from './api/routes/chat.routes';
 import sosRoutes from './api/routes/sos.routes';
+import bugReportRoutes from './api/routes/bugReport.routes';
 
 const app: Application = express();
 
@@ -55,6 +56,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/app', appVersionRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/sos', sosRoutes);
+app.use('/api/bug-reports', bugReportRoutes);
 
 
 export default app;

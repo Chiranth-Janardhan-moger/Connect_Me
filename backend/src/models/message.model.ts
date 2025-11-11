@@ -46,7 +46,6 @@ const MessageSchema = new Schema<IMessage>(
     expiresAt: {
       type: Date,
       required: true,
-      index: true,
     },
     deleted: {
       type: Boolean,

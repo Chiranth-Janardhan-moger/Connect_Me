@@ -4,6 +4,9 @@ node_modules/
 # Ignore environment files
 .env
 
+# Ignore Firebase credentials
+firebase-service-account.json
+
 # Ignore logs and temp files
 *.log
 npm-debug.log*

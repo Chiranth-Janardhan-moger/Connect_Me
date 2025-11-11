@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const admin_controller_1 = require("../controllers/admin.controller");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const role_middleware_1 = require("../middlewares/role.middleware");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.verifyToken, role_middleware_1.requireAdmin);
+router.post('/add-student', admin_controller_1.addStudent);
+router.post('/add-driver', admin_controller_1.addDriver);
+router.post('/add-route', admin_controller_1.addRoute);
+router.get('/routes', admin_controller_1.getAllRoutes);
+router.get('/users', admin_controller_1.getUsers);
+router.delete('/users/:userId', admin_controller_1.deleteUser);
+exports.default = router;

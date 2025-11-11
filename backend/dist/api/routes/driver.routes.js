@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const driver_controller_1 = require("../controllers/driver.controller");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const role_middleware_1 = require("../middlewares/role.middleware");
+const router = (0, express_1.Router)();
+router.post('/start-trip', [auth_middleware_1.verifyToken, role_middleware_1.requireDriver], driver_controller_1.startTrip);
+router.post('/end-trip', [auth_middleware_1.verifyToken, role_middleware_1.requireDriver], driver_controller_1.endTrip);
+exports.default = router;

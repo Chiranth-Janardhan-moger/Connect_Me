@@ -1,0 +1,5 @@
+{
+  "name": "College Bus Tracking System Backend",
+  "description": "A Node.js, Express, and Socket.io backend to provide real-time location tracking for college buses. It handles role-based authentication for students and drivers, trip management, and broadcasting live coordinates.",
+  "requestFramePermissions": []
+}

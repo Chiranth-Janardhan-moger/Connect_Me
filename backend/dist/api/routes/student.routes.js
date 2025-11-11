@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const student_controller_1 = require("../controllers/student.controller");
+const auth_middleware_1 = require("../middlewares/auth.middleware");
+const role_middleware_1 = require("../middlewares/role.middleware");
+const router = (0, express_1.Router)();
+router.get('/live-location', [auth_middleware_1.verifyToken, role_middleware_1.requireStudent], student_controller_1.getLiveLocation);
+router.get('/route-info', [auth_middleware_1.verifyToken, role_middleware_1.requireStudent], student_controller_1.getRouteInfo);
+exports.default = router;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView,Image } from 'react-native';
 import MapView, { Polyline, Marker } from 'react-native-maps';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
@@ -107,16 +107,24 @@ export default function Map() {
       </MapView>
 
       {/* Header - Overlay on Map */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
+      <View style={styles.headerContainer}>
+      <View style={styles.headerContent}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Image
+          source={require('../assets/images/BackButton.png')}
+          style={styles.backImage}
+          resizeMode="contain"
+        />
+      </TouchableOpacity>
+
+
         <Text style={styles.headerTitle}>{routeData.routeName}</Text>
-        <View style={styles.placeholder} />
+
+        {/* Placeholder to balance layout */}
+        <View style={styles.rightPlaceholder} />
       </View>
+      </View>
+
 
       {/* List View Overlay */}
       {viewMode === 'list' && (
@@ -188,7 +196,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 10,
     backgroundColor: '#E3F2FD',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
@@ -205,15 +213,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backIcon: {
-    fontSize: 28,
+    fontSize: 48,
     color: '#2C2C2C',
     fontWeight: '400',
+
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#2C2C2C',
-  },
+headerContainer: {
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: '#E3F2FD',
+  borderBottomLeftRadius: 20,
+  borderBottomRightRadius: 20,
+  zIndex: 100,
+  paddingTop: StatusBar.currentHeight || 40, // makes it safe on all devices
+  paddingBottom: 10,
+  elevation: 6,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 4,
+},
+backImage: {
+  width: 24,
+  height: 24,
+  tintColor: '#2C2C2C', // makes it match your text color; remove if you want full-color image
+},
+
+headerContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingHorizontal: 16,
+},
+
+
+headerTitle: {
+  fontSize: 20,
+  fontWeight: '600',
+  color: '#2C2C2C',
+},
+
+rightPlaceholder: {
+  width: 40, // keeps title centered
+},
   placeholder: {
     width: 40,
   },
@@ -243,10 +287,10 @@ const styles = StyleSheet.create({
   },
   listOverlay: {
     position: 'absolute',
-    top: 90,
+    top: 80,
     left: 0,
     right: 0,
-    bottom: 100,
+    bottom: 0,
     backgroundColor: 'rgba(255, 255, 255, 0.97)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

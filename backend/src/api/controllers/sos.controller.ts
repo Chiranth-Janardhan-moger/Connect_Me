@@ -23,14 +23,11 @@ export const sendSOS = async (req: Request, res: Response) => {
       userRole: user.role,
     };
 
-    // Broadcast SOS alert via Socket.IO to admin and drivers
+    // Broadcast SOS alert via Socket.IO to admin only
     const io = getIO();
     if (io) {
-      // Send to admin room
+      // Send to admin room only
       io.to('admin').emit('sos:alert', sosData);
-      
-      // Send to specific route drivers
-      io.to(`route_${routeNumber}`).emit('sos:alert', sosData);
       
       console.log(`SOS alert sent: ${type} from ${user.name} on route ${routeNumber}`);
     }

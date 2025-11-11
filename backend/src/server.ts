@@ -3,9 +3,13 @@ import app from './app';
 import config from './config';
 import connectDB from './config/db';
 import { initializeSocket } from './services/socket.service';
+import { initRedis } from './config/redis';
 
 const startServer = async () => {
     await connectDB();
+    
+    // Initialize Redis (optional)
+    initRedis();
 
     const server = http.createServer(app);
     

@@ -24,7 +24,28 @@ app.use(express.json());
 
 // API Routes
 app.get('/', (req: Request, res: Response) => {
-    res.send('College Bus Tracking API is running...');
+    res.json({
+        status: 'running',
+        message: 'College Bus Tracking API',
+        timestamp: new Date().toISOString(),
+        endpoints: {
+            auth: '/api/auth',
+            driver: '/api/driver',
+            student: '/api/student',
+            admin: '/api/admin',
+            notifications: '/api/notifications',
+            chat: '/api/chat',
+            sos: '/api/sos',
+        }
+    });
+});
+
+app.get('/health', (req: Request, res: Response) => {
+    res.json({
+        status: 'healthy',
+        socketIO: 'enabled',
+        timestamp: new Date().toISOString()
+    });
 });
 app.use('/api/auth', authRoutes);
 app.use('/api/driver', driverRoutes);

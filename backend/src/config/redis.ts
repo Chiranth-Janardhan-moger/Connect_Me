@@ -1,23 +1,26 @@
-import Redis from 'ioredis';
+import { Redis } from '@upstash/redis';
 
 let redisClient: Redis | null = null;
 
 export const initRedis = () => {
   try {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+    const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+    const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
     
-    redisClient = new Redis(redisUrl, {
-      retryStrategy: (times: number) => Math.min(times * 50, 2000),
-      maxRetriesPerRequest: 3,
+    if (!redisUrl || !redisToken) {
+      console.log('Redis not configured (optional) - skipping initialization');
+      return;
+    }
+    
+    redisClient = new Redis({
+      url: redisUrl,
+      token: redisToken,
     });
 
-    redisClient.on('connect', () => console.log('Redis connected'));
-    redisClient.on('error', (err: Error) => console.error('Redis error:', err));
-
-    return redisClient;
+    console.log('Upstash Redis initialized successfully');
   } catch (error) {
-    console.error('Redis init error:', error);
-    return null;
+    console.error('Redis initialization failed:', error);
+    redisClient = null;
   }
 };
 

@@ -10,7 +10,7 @@ class CacheService {
     try {
       const key = `bus:location:${routeNumber}`;
       const value = JSON.stringify({ lat, lon, timestamp: Date.now() });
-      await redis.setex(key, LOCATION_TTL, value);
+      await redis.set(key, value, { ex: LOCATION_TTL });
       return true;
     } catch (error) {
       console.error('Cache set error:', error);
@@ -25,7 +25,10 @@ class CacheService {
     try {
       const key = `bus:location:${routeNumber}`;
       const value = await redis.get(key);
-      return value ? JSON.parse(value) : null;
+      if (typeof value === 'string') {
+        return JSON.parse(value);
+      }
+      return value;
     } catch (error) {
       console.error('Cache get error:', error);
       return null;

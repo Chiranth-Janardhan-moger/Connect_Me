@@ -161,10 +161,13 @@ export const initializeSocket = (httpServer: HttpServer) => {
     return io;
 };
 
+// Helper function to get io instance
+export const getIO = () => io;
+
 // Helper function to notify students when trip ends
 export const notifyTripEnded = (routeNumber: number) => {
     if (io) {
-        console.log(`📢 Notifying students on route ${routeNumber} that trip has ended`);
+        console.log(`Notifying students on route ${routeNumber} that trip has ended`);
         io.to(routeNumber.toString()).emit('student:trip-ended', {
             message: 'The bus trip has ended',
             timestamp: new Date(),

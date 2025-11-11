@@ -8,6 +8,8 @@ import studentRoutes from './api/routes/student.routes';
 import adminRoutes from './api/routes/admin.routes';
 import notificationRoutes from './api/routes/notification.routes';
 import appVersionRoutes from './api/routes/appVersion.routes';
+import chatRoutes from './api/routes/chat.routes';
+import sosRoutes from './api/routes/sos.routes';
 
 const app: Application = express();
 
@@ -30,6 +32,8 @@ app.use('/api/student', studentRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/app', appVersionRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/sos', sosRoutes);
 
 
 export default app;

@@ -109,6 +109,50 @@ export const initializeSocket = (httpServer: HttpServer) => {
             }
         });
 
+        // Chat: Join room
+        socket.on('chat:join', ({ routeNumber }, callback) => {
+            if (!routeNumber) {
+                if (callback) callback({ success: false, error: 'Route number required' });
+                return;
+            }
+            const roomName = `chat_${routeNumber}`;
+            socket.join(roomName);
+            console.log(`User joined chat room: ${roomName}`);
+            if (callback) callback({ success: true });
+        });
+
+        // Chat: Leave room
+        socket.on('chat:leave', ({ routeNumber }) => {
+            if (!routeNumber) return;
+            const roomName = `chat_${routeNumber}`;
+            socket.leave(roomName);
+            console.log(`User left chat room: ${roomName}`);
+        });
+
+        // Chat: Send message (broadcast to room)
+        socket.on('chat:message', (data) => {
+            const { routeNumber, encryptedContent, timestamp } = data;
+            if (!routeNumber || !encryptedContent) return;
+            
+            const roomName = `chat_${routeNumber}`;
+            io?.to(roomName).emit('chat:message', {
+                encryptedContent,
+                timestamp,
+                senderId: data.senderId,
+                senderName: data.senderName,
+            });
+            console.log(`Message broadcast to room: ${roomName}`);
+        });
+
+        // Chat: Typing indicator
+        socket.on('chat:typing', ({ routeNumber }) => {
+            if (!routeNumber) return;
+            const roomName = `chat_${routeNumber}`;
+            socket.to(roomName).emit('chat:typing', {
+                userId: socket.id,
+            });
+        });
+
         socket.on('disconnect', () => {
             console.log(`Client disconnected: ${socket.id}`);
         });

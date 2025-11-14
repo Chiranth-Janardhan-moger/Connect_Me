@@ -105,12 +105,13 @@ export const deleteMessage = async (req: Request, res: Response) => {
   try {
     const { messageId } = req.params;
     const user = (req as any).user;
+    const { routeNumber, forEveryone } = req.body || {};
 
     if (!messageId) {
       return res.status(400).json({ error: 'Message ID required' });
     }
 
-    const deleted = await chatService.deleteMessage(messageId, user.id);
+    const deleted = await chatService.deleteMessage(messageId, user.id, routeNumber);
 
     if (!deleted) {
       return res.status(404).json({ error: 'Message not found' });

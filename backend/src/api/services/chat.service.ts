@@ -12,9 +12,9 @@ class ChatService {
     encryptedContent: string;
   }): Promise<IMessage> {
     try {
-      // Messages expire after 7 days
+      // Messages expire after 3 days
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
+      expiresAt.setDate(expiresAt.getDate() + 3);
 
       const message = new Message({
         roomId: data.roomId,
@@ -47,7 +47,6 @@ class ChatService {
     try {
       const query: any = {
         roomId,
-        deleted: false,
       };
 
       if (before) {
@@ -68,13 +67,20 @@ class ChatService {
   }
 
   /**
-   * Delete message (soft delete)
+   * Delete message (soft delete for everyone)
+   * Optionally validates the roomId against the provided routeNumber
    */
-  async deleteMessage(messageId: string, userId: string): Promise<boolean> {
+  async deleteMessage(messageId: string, userId: string, routeNumber?: string): Promise<boolean> {
     try {
       const message = await Message.findById(messageId);
 
       if (!message) {
+        return false;
+      }
+
+      // Optional room validation: ensure message belongs to the requested chat room
+      if (routeNumber && message.roomId?.toString() !== routeNumber.toString()) {
+        console.warn(`Attempt to delete message ${messageId} from mismatched room. Expected ${routeNumber}, got ${message.roomId}`);
         return false;
       }
 

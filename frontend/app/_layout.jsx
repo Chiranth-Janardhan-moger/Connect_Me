@@ -3,18 +3,20 @@ import 'react-native-get-random-values';
 
 import { Stack } from "expo-router";
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { View, StyleSheet, StatusBar } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { registerForPushNotificationsAsync } from '../src/config/notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CustomAlert from './components/CustomAlert';
+import { NetworkAlert } from './components/NetworkAlert';
 
 export default function RootLayout() {
-  const [isOffline, setIsOffline] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
+    // Network status monitoring
     const unsubscribe = NetInfo.addEventListener((state) => {
-      setIsOffline(!(state.isConnected && state.isInternetReachable !== false));
+      setIsOnline(state.isConnected && state.isInternetReachable !== false);
     });
     return () => unsubscribe();
   }, []);
@@ -34,11 +36,7 @@ export default function RootLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      {isOffline && (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>Offline — waiting for connection…</Text>
-        </View>
-      )}
+      <NetworkAlert isOnline={isOnline} />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -75,14 +73,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  offlineBanner: {
-    backgroundColor: '#dc2626',
-    paddingVertical: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  offlineText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
+  // Styles moved to NetworkStatusBanner component
 });

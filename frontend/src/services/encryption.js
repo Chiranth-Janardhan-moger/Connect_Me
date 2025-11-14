@@ -17,6 +17,8 @@ if (typeof crypto === 'undefined' || typeof crypto.getRandomValues !== 'function
 
 const KEY_STORAGE_KEY = STORAGE_KEYS.CHAT_ENCRYPTION_KEY;
 const KEY_SIZE = ENCRYPTION_CONFIG.CHAT_KEY_SIZE; // bits
+// Deterministic shared seed so all clients derive the same chat key
+const SHARED_CHAT_KEY_SEED = 'CONNECT_ME_CHAT_SHARED_KEY_V1';
 
 class EncryptionService {
   constructor() {
@@ -48,25 +50,12 @@ class EncryptionService {
       
       console.log('✅ Secure random generator verified:', Array.from(testArray.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join(' '));
       
-      // Try to load existing key
-      const storedKey = await AsyncStorage.getItem(KEY_STORAGE_KEY);
-      
-      if (storedKey) {
-        // Verify stored key format
-        if (storedKey.length === 64 && /^[0-9a-f]+$/i.test(storedKey)) {
-          this.encryptionKey = storedKey;
-          console.log('🔐 Loaded existing encryption key (64 hex chars)');
-        } else {
-          console.warn('⚠️ Invalid stored key format, generating new key');
-          await this.generateKey();
-        }
-      } else {
-        // Generate new key
-        await this.generateKey();
-      }
+      // Derive a deterministic shared key so all devices can decrypt messages
+      this.encryptionKey = CryptoJS.SHA256(SHARED_CHAT_KEY_SEED).toString();
+      await AsyncStorage.setItem(KEY_STORAGE_KEY, this.encryptionKey);
 
       this.initialized = true;
-      console.log('✅ Encryption service initialized successfully');
+      console.log('✅ Encryption service initialized successfully with shared chat key');
     } catch (error) {
       console.error('❌ Encryption initialization error:', error);
       

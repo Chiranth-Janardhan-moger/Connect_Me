@@ -20,8 +20,6 @@ import { StatusBanner } from './components/StatusBanner';
 import { ETACard } from './components/ETACard';
 import ErrorBoundary from './components/ErrorBoundary';
 import { showErrorAlert, showWarningAlert } from './components/CustomAlert';
-import { NetworkAlert } from './components/NetworkAlert';
-import { useNetworkStatus } from '../src/hooks/useNetworkStatus';
 import { fetchETA } from '../src/services/etaService';
 import { getPreloaded } from '../src/services/mapPreload';
 
@@ -40,9 +38,6 @@ function MapScreen() {
   const hasCenteredMap = useRef(false);
   const hasCenteredOnBus = useRef(false);
   const mapReadyRef = useRef(false);
-
-  // Network status monitoring
-  const { isOnline } = useNetworkStatus();
 
   const {
     location: studentLocation,
@@ -405,9 +400,6 @@ function MapScreen() {
         stopsAway={stopsAway}
         visible={tripStatus === 'ON_ROUTE'}
       />
-
-      {/* Network Status Alert */}
-      <NetworkAlert isOnline={isOnline} />
       
     </View>
   );

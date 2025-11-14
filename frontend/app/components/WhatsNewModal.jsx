@@ -67,10 +67,8 @@ const WhatsNewModal = ({ visible, versionDetails, onClose }) => {
       onRequestClose={handleClose}
     >
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
-        <TouchableOpacity
+        <View
           style={styles.overlayTouch}
-          activeOpacity={1}
-          onPress={handleClose}
         >
           <Animated.View
             style={[
@@ -80,27 +78,28 @@ const WhatsNewModal = ({ visible, versionDetails, onClose }) => {
               },
             ]}
           >
-            <TouchableOpacity activeOpacity={1}>
-              {/* Header with gradient */}
-              <LinearGradient
-                colors={['#0ea5e9', '#2563eb']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.header}
-              >
-                <View style={styles.celebrationIcon}>
-                  <Text style={styles.celebrationEmoji}>🎉</Text>
-                </View>
-                <Text style={styles.headerTitle}>What's New</Text>
-                <Text style={styles.versionText}>Version {versionDetails.version}</Text>
-                <Text style={styles.dateText}>{versionDetails.date}</Text>
-              </LinearGradient>
+            {/* Header with gradient */}
+            <LinearGradient
+              colors={['#0ea5e9', '#2563eb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.header}
+            >
+              <View style={styles.celebrationIcon}>
+                <Text style={styles.celebrationEmoji}>🎉</Text>
+              </View>
+              <Text style={styles.headerTitle}>What's New</Text>
+              <Text style={styles.versionText}>Version {versionDetails.version}</Text>
+              <Text style={styles.dateText}>{versionDetails.date}</Text>
+            </LinearGradient>
 
-              {/* Content */}
-              <ScrollView
-                style={styles.content}
-                showsVerticalScrollIndicator={false}
-              >
+            {/* Content */}
+            <ScrollView
+              style={styles.content}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+            >
                 <Text style={styles.updateTitle}>{versionDetails.title}</Text>
 
                 {/* Features */}
@@ -154,25 +153,24 @@ const WhatsNewModal = ({ visible, versionDetails, onClose }) => {
                 <View style={styles.bottomSpace} />
               </ScrollView>
 
-              {/* Close Button */}
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={handleClose}
-                activeOpacity={0.8}
+            {/* Close Button */}
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={handleClose}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={['#0ea5e9', '#2563eb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.closeButtonGradient}
               >
-                <LinearGradient
-                  colors={['#0ea5e9', '#2563eb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.closeButtonGradient}
-                >
-                  <Text style={styles.closeButtonText}>Got It!</Text>
-                  <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                </LinearGradient>
-              </TouchableOpacity>
+                <Text style={styles.closeButtonText}>Got It!</Text>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              </LinearGradient>
             </TouchableOpacity>
           </Animated.View>
-        </TouchableOpacity>
+        </View>
       </Animated.View>
     </Modal>
   );

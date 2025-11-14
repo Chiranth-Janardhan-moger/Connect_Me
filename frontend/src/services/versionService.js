@@ -14,3 +14,10 @@ export const getCurrentVersion = () => {
 export const getAllVersions = () => {
   return changelogData.versions;
 };
+
+/**
+ * Get latest version details (for What's New modal)
+ */
+export const getLatestVersion = () => {
+  return changelogData.versions[0]; // First version is the latest
+};

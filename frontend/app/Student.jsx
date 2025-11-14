@@ -17,8 +17,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import ErrorModal from './components/ErrorModal';
+import WhatsNewModal from './components/WhatsNewModal';
 import { preloadMapData } from '../src/services/mapPreload';
 import { showConfirmAlert, showErrorAlert, showSuccessAlert } from './components/CustomAlert';
+import { shouldShowWhatsNew, markWhatsNewAsShown, getWhatsNewContent } from '../src/services/whatsNewService';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +32,8 @@ const Home = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorTitle, setErrorTitle] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [whatsNewContent, setWhatsNewContent] = useState(null);
   const router = useRouter();
   
   // Animation values
@@ -45,6 +49,7 @@ const Home = () => {
 
   useEffect(() => {
     fetchUserData();
+    checkWhatsNewStatus();
     // Preload map data in background for faster map open
     preloadMapData().catch(() => {});
     // Request (but do not start tracking) permission at student home
@@ -108,6 +113,33 @@ const Home = () => {
     } catch (error) {
       console.error('Error fetching user data:', error);
       setUserName('User');
+    }
+  };
+
+  const checkWhatsNewStatus = async () => {
+    try {
+      const shouldShow = await shouldShowWhatsNew();
+      if (shouldShow) {
+        const content = getWhatsNewContent();
+        if (content) {
+          setWhatsNewContent(content);
+          setShowWhatsNew(true);
+          console.log('📱 Showing What\'s New modal for version:', content.version);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking What\'s New status:', error);
+    }
+  };
+
+  const handleWhatsNewClose = async () => {
+    try {
+      await markWhatsNewAsShown();
+      setShowWhatsNew(false);
+      console.log('✅ What\'s New modal closed and marked as shown');
+    } catch (error) {
+      console.error('Error closing What\'s New modal:', error);
+      setShowWhatsNew(false);
     }
   };
 
@@ -426,6 +458,12 @@ const Home = () => {
         title={errorTitle}
         message={errorMessage}
         onClose={() => setErrorModalVisible(false)}
+      />
+
+      <WhatsNewModal
+        visible={showWhatsNew}
+        versionDetails={whatsNewContent}
+        onClose={handleWhatsNewClose}
       />
     </View>
   );

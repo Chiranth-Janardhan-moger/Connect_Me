@@ -18,6 +18,13 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { preloadMapData } from '../src/services/mapPreload';
 import ErrorModal from './components/ErrorModal';
+import { 
+  isAccountLocked, 
+  recordFailedAttempt, 
+  clearFailedAttempts, 
+  getRemainingAttempts, 
+  formatLockoutTime 
+} from '../src/services/loginRateLimitService';
 
 export default function Login() {
   const router = useRouter();
@@ -66,6 +73,17 @@ export default function Login() {
 
     if (!isValid) return;
 
+    // Check if account is locked due to failed attempts
+    const lockStatus = await isAccountLocked(email.trim());
+    if (lockStatus.locked) {
+      const timeRemaining = formatLockoutTime(lockStatus.remainingTime);
+      showErrorModal(
+        'Account Temporarily Locked',
+        `Too many failed login attempts. Please try again in ${timeRemaining}.\n\nThis security measure protects your account from unauthorized access.`
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -73,6 +91,9 @@ export default function Login() {
       const response = await authAPI.login(email.trim(), password);
 
       if (response.ok) {
+        // Clear failed attempts on successful login
+        await clearFailedAttempts();
+        
         // Store token and user info
         await AsyncStorage.setItem('authToken', response.data.token);
         await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
@@ -102,23 +123,34 @@ export default function Login() {
             showErrorModal('Error', 'Invalid user role');
         }
       } else {
-        let errorMsg = 'An error occurred. Please try again.';
-
-        switch (response.status) {
-          case 401:
-            errorMsg = 'Invalid email or password.';
-            break;
-          case 404:
-            errorMsg = 'User not found. Please contact admin.';
-            break;
-          case 500:
-            errorMsg = 'Server error. Please try again later.';
-            break;
-          default:
-            errorMsg = response.data.message || errorMsg;
+        // Record failed attempt for invalid credentials
+        if (response.status === 401 || response.status === 404) {
+          const failResult = await recordFailedAttempt(email.trim());
+          const remaining = await getRemainingAttempts(email.trim());
+          
+          let errorMsg = 'Invalid email or password.';
+          
+          if (failResult.locked) {
+            errorMsg = `Account locked due to too many failed attempts. Please try again in 1 hour.\n\nThis security measure protects your account from unauthorized access.`;
+          } else if (remaining <= 2) {
+            errorMsg = `Invalid email or password.\n\nWarning: ${remaining} attempts remaining before account lockout.`;
+          }
+          
+          showErrorModal('Login Failed', errorMsg);
+        } else {
+          // Other errors (server errors, etc.)
+          let errorMsg = 'An error occurred. Please try again.';
+          
+          switch (response.status) {
+            case 500:
+              errorMsg = 'Server error. Please try again later.';
+              break;
+            default:
+              errorMsg = response.data.message || errorMsg;
+          }
+          
+          showErrorModal('Login Failed', errorMsg);
         }
-
-        showErrorModal('Login Failed', errorMsg);
       }
     } catch (error) {
       console.error('Login error:', error);

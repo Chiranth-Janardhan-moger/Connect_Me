@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { BANGALORE_BOUNDS, ZOOM_LEVELS } from '../../src/config/mapConfig';
 
 const OpenStreetMapView = ({ 
   initialRegion, 
@@ -18,6 +19,16 @@ const OpenStreetMapView = ({
   const generateMapHTML = () => {
     if (mapHTMLRef.current) return mapHTMLRef.current;
     
+    const boundsConfig = {
+      north: BANGALORE_BOUNDS.north,
+      south: BANGALORE_BOUNDS.south,
+      east: BANGALORE_BOUNDS.east,
+      west: BANGALORE_BOUNDS.west,
+      minZoom: ZOOM_LEVELS.MIN,
+      maxZoom: ZOOM_LEVELS.MAX,
+      defaultZoom: ZOOM_LEVELS.DEFAULT,
+    };
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -76,7 +87,12 @@ const OpenStreetMapView = ({
       
       try {
         const region = ${JSON.stringify(initialRegion)};
+        const bounds = ${JSON.stringify(boundsConfig)};
         
+        const southWest = L.latLng(bounds.south, bounds.west);
+        const northEast = L.latLng(bounds.north, bounds.east);
+        const mapBounds = L.latLngBounds(southWest, northEast);
+
         map = L.map('map', {
           zoomControl: true,
           attributionControl: false,
@@ -91,13 +107,15 @@ const OpenStreetMapView = ({
           tap: true,
           touchZoom: true,
           scrollWheelZoom: false,
-          renderer: L.canvas({ tolerance: 5 })
-        }).setView([region.latitude, region.longitude], 13);
+          renderer: L.canvas({ tolerance: 5 }),
+          maxBounds: mapBounds,
+          maxBoundsViscosity: 1.0
+        }).setView([region.latitude, region.longitude], bounds.defaultZoom);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '',
-          maxZoom: 19,
-          minZoom: 10,
+          maxZoom: bounds.maxZoom,
+          minZoom: bounds.minZoom,
           updateWhenIdle: false,
           updateWhenZooming: false,
           keepBuffer: 4,

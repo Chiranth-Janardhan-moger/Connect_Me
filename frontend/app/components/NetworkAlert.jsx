@@ -32,13 +32,13 @@ export const NetworkAlert = ({ isOnline, topOffset = 72 }) => {
       setTimeout(() => {
         Animated.timing(slideAnim, {
           toValue: -60,
-          duration: 300,
+          duration: 200,
           useNativeDriver: true,
         }).start(() => {
           setShowBanner(false);
           setWasOffline(false);
         });
-      }, 3000);
+      }, 2000);
     }
   }, [isOnline]);
 

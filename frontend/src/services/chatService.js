@@ -115,10 +115,10 @@ class ChatService {
     // Initialize lastMessageId on first poll
     let isFirstPoll = true;
     
-    // Poll every 3 seconds
+    // Poll every 5 seconds (reduced frequency)
     this.pollingInterval = setInterval(async () => {
       try {
-        const result = await this.getChatHistory(routeNumber, 20);
+        const result = await this.getChatHistory(routeNumber, 10);
         if (result.success && result.messages.length > 0) {
           const latestMessage = result.messages[result.messages.length - 1];
           
@@ -128,6 +128,7 @@ class ChatService {
             isFirstPoll = false;
           } else if (this.lastMessageId !== latestMessage._id) {
             // New message detected
+            console.log('📬 Polling detected new message:', latestMessage._id);
             this.lastMessageId = latestMessage._id;
             
             // Notify listeners of new message
@@ -139,7 +140,7 @@ class ChatService {
       } catch (error) {
         console.error('Polling error:', error);
       }
-    }, 3000);
+    }, 5000);
   }
 
   /**
@@ -164,11 +165,12 @@ class ChatService {
   /**
    * Send message
    */
-  async sendMessage(content, routeNumber) {
+  async sendMessage(content, routeNumber, senderId, senderName) {
     try {
       console.log('🔵 [CHAT SERVICE] Starting sendMessage...');
       console.log('📝 Content length:', content.length);
       console.log('🚌 Route number:', routeNumber);
+      console.log('👤 Sender:', senderName, '(ID:', senderId, ')');
       
       // Encrypt message
       console.log('🔐 [CHAT SERVICE] Encrypting message...');
@@ -192,6 +194,8 @@ class ChatService {
         body: JSON.stringify({
           routeNumber,
           encryptedContent,
+          senderId,
+          senderName,
           timestamp: new Date().toISOString(),
         }),
       });
@@ -208,6 +212,8 @@ class ChatService {
         this.socket.emit('chat:message', {
           routeNumber,
           encryptedContent,
+          senderId,
+          senderName,
           timestamp: new Date().toISOString(),
         });
         console.log('✅ [CHAT SERVICE] Socket.IO broadcast sent');
@@ -264,6 +270,15 @@ class ChatService {
       if (response.ok && response.data) {
         // Decrypt messages
         const decryptedMessages = response.data.messages.map(msg => {
+          // If message is marked deleted, show placeholder instead of decrypting
+          if (msg.deleted) {
+            return {
+              ...msg,
+              content: 'This message was deleted',
+              decrypted: true,
+            };
+          }
+
           try {
             return {
               ...msg,
@@ -312,15 +327,25 @@ class ChatService {
   }
 
   /**
-   * Delete message (admin only)
+   * Delete message via API
+   * - routeNumber is used by backend to ensure room context
+   * - forEveryone=true => delete for everyone (soft delete in DB)
    */
-  async deleteMessage(messageId) {
+  async deleteMessage(messageId, routeNumber, forEveryone = false) {
     try {
-      const response = await apiCall(`/api/chat/delete/${messageId}`, {
+      const response = await apiCall(`/api/chat/message/${messageId}`, {
         method: 'DELETE',
+        body: JSON.stringify({ routeNumber, forEveryone }),
       });
 
-      return { success: response.ok };
+      if (!response.ok) {
+        return {
+          success: false,
+          error: response.data?.error || response.data?.message || `HTTP ${response.status}`,
+        };
+      }
+
+      return { success: true, data: response.data };
     } catch (error) {
       console.error('Delete message error:', error);
       return { success: false, error: error.message };

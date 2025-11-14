@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "BMS Connect",
+    "slug": "bms-connect",
+    "version": "1.4.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.webp",
+    "scheme": "bmsconnect",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.chiranth7.bmsconnect",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to track the bus in real time.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "We need your location to track the bus even in the background."
+      },
+      "backgroundModes": ["location"]
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "com.chiranth7.bmsconnect",
+      "usesCleartextTraffic": true,
+      "jsEngine": "hermes",
+      "enableProguardInReleaseBuilds": true,
+      "shrinkResourcesInReleaseBuilds": true,
+      "locationGooglePlayServicesVersion": "21.0.1"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.webp"
+    },
+    "plugins": [
+
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.swmansion.reanimated.** { *; }\n-keep class com.swmansion.gesturehandler.** { *; }\n-keep class com.reactnativecommunity.webview.** { *; }\n-keep class expo.modules.** { *; }\n-dontwarn com.facebook.hermes.**\n-keepattributes *Annotation*",
+            "gradleProperties": {
+              "reactNativeArchitectures": "arm64-v8a,armeabi-v7a"
+            }
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6bf7f90d-fead-49ce-872e-856194e8af52"
+      }
+    }
+  }
+}

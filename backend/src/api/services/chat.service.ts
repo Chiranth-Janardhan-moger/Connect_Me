@@ -75,7 +75,9 @@ class ChatService {
       const message = await Message.findById(messageId);
 
       if (!message) {
-        return false;
+        // If message is already gone, treat as success (idempotent delete)
+        console.warn(`Delete requested for non-existent message ${messageId}, treating as success`);
+        return true;
       }
 
       // Optional room validation: ensure message belongs to the requested chat room
@@ -84,9 +86,18 @@ class ChatService {
         return false;
       }
 
-      // Only allow sender or admin to delete
+      // Only allow sender or admin to delete, but if already deleted, treat as success
       if (message.senderId.toString() !== userId && message.senderRole !== 'admin') {
+        if (message.deleted) {
+          console.warn(`Unauthorized delete on already-deleted message ${messageId}, treating as success`);
+          return true;
+        }
         throw new Error('Unauthorized to delete this message');
+      }
+
+      if (message.deleted) {
+        console.log(`Message ${messageId} already marked deleted, treating as success`);
+        return true;
       }
 
       message.deleted = true;

@@ -15,6 +15,7 @@ module.exports = function (api) {
           },
         },
       ],
+      // 'react-native-reanimated/plugin', // Temporarily disabled due to worklets issue
     ],
   };
 };

@@ -1,0 +1,334 @@
+{
+  "currentVersion": "1.4.14",
+  "versions": [
+    {
+      "version": "1.4.14",
+      "date": "2025-11-14",
+      "title": "Global Network Status Banner",
+      "features": [
+        "Beautiful global network status banner on all pages",
+        "Red offline banner when internet disconnects",
+        "Green connected banner with smooth animation",
+        "Auto-hide connected banner after 2 seconds"
+      ],
+      "improvements": [
+        "Removed old intrusive pop-up alerts",
+        "Removed duplicate network cards",
+        "Unified and consistent network UX across the app"
+      ],
+      "fixes": [
+        "Network status not appearing on some pages",
+        "Random network alerts appearing on map screen"
+      ]
+    },
+    {
+      "version": "1.4.13",
+      "date": "2025-11-14",
+      "title": "What's New Modal Scrolling Upgrade",
+      "features": [],
+      "improvements": [
+        "Smooth scrolling experience inside What's New modal",
+        "Improved touch and gesture handling",
+        "Better nested scroll behavior"
+      ],
+      "fixes": [
+        "Unable to scroll long changelog content",
+        "Touch events not responding inside modal"
+      ]
+    },
+    {
+      "version": "1.4.12",
+      "date": "2025-11-14",
+      "title": "Ultra-Reliable Chat Delete System",
+      "features": [],
+      "improvements": [
+        "Delete-for-everyone now extremely stable",
+        "Handles already-deleted messages safely",
+        "No more temporary ID issues"
+      ],
+      "fixes": [
+        "Delete failures in some cases",
+        "Random delete error popups"
+      ]
+    },
+    {
+      "version": "1.4.11",
+      "date": "2025-11-14",
+      "title": "Map Geofence - Locked to Bangalore",
+      "features": [
+        "Map fully locked to Bangalore",
+        "Prevents accidental panning outside city",
+        "City-only zoom-out limit"
+      ],
+      "improvements": [
+        "Better map performance",
+        "Reduced data usage",
+        "City-focused navigation experience"
+      ],
+      "fixes": [
+        "Map escaping outside boundaries"
+      ]
+    },
+    {
+      "version": "1.4.10",
+      "date": "2025-11-14",
+      "title": "Chat Encryption Fix",
+      "features": [],
+      "improvements": [
+        "Decryption now works for all users in a route",
+        "Cleaner encryption handling"
+      ],
+      "fixes": [
+        "Messages appearing as encrypted text instead of real content"
+      ]
+    },
+    {
+      "version": "1.4.9",
+      "date": "2025-11-14",
+      "title": "Chat Deletion & UI Enhancements",
+      "features": [],
+      "improvements": [
+        "Modern delete confirmation banners",
+        "Cleaner deleted message placeholders"
+      ],
+      "fixes": [
+        "Delete API mismatches",
+        "Cross-device delete inconsistency"
+      ]
+    },
+    {
+      "version": "1.4.8",
+      "date": "2025-11-14",
+      "title": "Input Bar & Keyboard Experience",
+      "features": [],
+      "improvements": [
+        "Input bar smoothly moves above keyboard",
+        "Better keyboard handling on Android & iOS"
+      ],
+      "fixes": [
+        "Input bar going under keyboard",
+        "Minor chat UI issues",
+        "Small message delete API issues"
+      ]
+    },
+    {
+      "version": "1.4.7",
+      "date": "2025-11-14",
+      "title": "Stability Patch",
+      "features": [],
+      "improvements": [],
+      "fixes": [
+        "General bug fixes and stability improvements"
+      ]
+    },
+    {
+      "version": "1.4.6",
+      "date": "2025-11-14",
+      "title": "Login Security Upgrade",
+      "features": [
+        "Account lockout after 5 failed login attempts",
+        "1-hour cooldown safety window",
+        "Real-time feedback for failed logins"
+      ],
+      "improvements": [
+        "Stronger protection against unauthorized access",
+        "Clearer feedback for login errors"
+      ],
+      "fixes": [
+        "Login rate limiting issues",
+        "Cooldown timer bugs"
+      ]
+    },
+    {
+      "version": "1.4.5",
+      "date": "2025-11-14",
+      "title": "Smart What's New Modal",
+      "features": [
+        "Changelog popup appears only for new versions",
+        "Clean and animated modal design"
+      ],
+      "improvements": [
+        "Better onboarding experience",
+        "Accurate version tracking"
+      ],
+      "fixes": [
+        "Modal showing repeatedly",
+        "Wrong changelog data loading"
+      ]
+    },
+    {
+      "version": "1.4.4",
+      "date": "2025-11-14",
+      "title": "WhatsApp-like Chat Experience",
+      "features": [
+        "Messages appear at the bottom",
+        "Input stays above keyboard",
+        "Perfect auto-scroll behavior",
+        "Smooth keyboard transitions"
+      ],
+      "improvements": [
+        "Modern chat interaction",
+        "Better performance even with large message history"
+      ],
+      "fixes": [
+        "Messages appearing on top",
+        "Input hidden during typing",
+        "Auto-scroll not working correctly"
+      ]
+    },
+    {
+      "version": "1.4.3",
+      "date": "2025-11-14",
+      "title": "Chat Stability Fixes",
+      "features": [],
+      "improvements": [
+        "More reliable message handling",
+        "Improved chat performance"
+      ],
+      "fixes": [
+        "Message sync issues",
+        "Delivery inconsistencies"
+      ]
+    },
+    {
+      "version": "1.4.2",
+      "date": "2025-11-14",
+      "title": "Device Compatibility Update",
+      "features": [
+        "Better performance across various screen sizes"
+      ],
+      "improvements": [
+        "Improved chat rendering on different devices"
+      ],
+      "fixes": [
+        "Device-specific layout issues"
+      ]
+    },
+    {
+      "version": "1.4.1",
+      "date": "2025-11-14",
+      "title": "Changelog System Integration",
+      "features": [
+        "Built-in version tracking",
+        "Integrated update logs"
+      ],
+      "improvements": [
+        "Better documentation flow",
+        "More accurate version information"
+      ],
+      "fixes": [
+        "Minor tracking inconsistencies"
+      ]
+    },
+    {
+      "version": "1.4.0",
+      "date": "2025-11-11",
+      "title": "Major Release – Intelligent Transport System",
+      "features": [
+        "End-to-end encrypted chat (AES-256)",
+        "Hybrid GPS + WiFi + Sensor location accuracy",
+        "Indoor/outdoor auto detection",
+        "Smart SOS with auto accident detection",
+        "Traffic-aware ETA prediction",
+        "Predictive map caching for 10x faster loading",
+        "Offline bus prediction up to 5 minutes",
+        "Bangalore map geofence",
+        "Real-time live updates with sockets"
+      ],
+      "improvements": [
+        "Map loading speed improved massively",
+        "Data usage reduced drastically",
+        "Indoor accuracy boosted significantly",
+        "Smoother UI during location updates"
+      ],
+      "fixes": [
+        "Map loading issues on certain devices",
+        "Login input issues on some Android phones",
+        "UI stutters during live location updates",
+        "Memory leaks in certain operations"
+      ]
+    },
+    {
+      "version": "1.3.1",
+      "date": "2025-11-09",
+      "title": "Push Notification Beta",
+      "features": [
+        "Real-time push notifications"
+      ],
+      "improvements": [
+        "Faster message delivery"
+      ],
+      "fixes": [
+        "Missing notifications on certain devices"
+      ]
+    },
+    {
+      "version": "1.3.0",
+      "date": "2025-11-05",
+      "title": "Map Caching Alpha",
+      "features": [
+        "Offline map access after first load",
+        "Map loading now 85% faster"
+      ],
+      "improvements": [
+        "Reduced data consumption",
+        "Smoother scrolling and zooming"
+      ],
+      "fixes": [
+        "Slow map loading on weak networks",
+        "Indoor GPS issues"
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2025-11-04",
+      "title": "Location Tracking Upgrade",
+      "features": [
+        "More accurate GPS updates",
+        "Smooth, real-time marker animations"
+      ],
+      "improvements": [
+        "Improved movement detection",
+        "Less jitter and noise"
+      ],
+      "fixes": [
+        "Marker not updating in real-time",
+        "Indoor accuracy problems"
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "date": "2025-11-03",
+      "title": "Experience Upgrade",
+      "features": [
+        "Trip update notifications",
+        "Enhanced real-time route tracking"
+      ],
+      "improvements": [
+        "Better location stability",
+        "Improved connection performance"
+      ],
+      "fixes": [
+        "Wrong route locations for some users",
+        "Background tracking issues"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-11-01",
+      "title": "Initial Prototype",
+      "features": [
+        "Live bus tracking",
+        "Smart ETA calculation",
+        "Basic SOS feature",
+        "Simple in-app chat",
+        "Modern animated interface"
+      ],
+      "improvements": [
+        "Optimized for all devices",
+        "Smooth performance on slow networks"
+      ],
+      "fixes": []
+    }
+  ]
+}

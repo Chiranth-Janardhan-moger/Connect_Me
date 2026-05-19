@@ -12,9 +12,9 @@ class ChatService {
     encryptedContent: string;
   }): Promise<IMessage> {
     try {
-      // Messages expire after 7 days
+      // Messages expire after 3 days
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7);
+      expiresAt.setDate(expiresAt.getDate() + 3);
 
       const message = new Message({
         roomId: data.roomId,
@@ -47,7 +47,6 @@ class ChatService {
     try {
       const query: any = {
         roomId,
-        deleted: false,
       };
 
       if (before) {
@@ -68,19 +67,37 @@ class ChatService {
   }
 
   /**
-   * Delete message (soft delete)
+   * Delete message (soft delete for everyone)
+   * Optionally validates the roomId against the provided routeNumber
    */
-  async deleteMessage(messageId: string, userId: string): Promise<boolean> {
+  async deleteMessage(messageId: string, userId: string, routeNumber?: string): Promise<boolean> {
     try {
       const message = await Message.findById(messageId);
 
       if (!message) {
+        // If message is already gone, treat as success (idempotent delete)
+        console.warn(`Delete requested for non-existent message ${messageId}, treating as success`);
+        return true;
+      }
+
+      // Optional room validation: ensure message belongs to the requested chat room
+      if (routeNumber && message.roomId?.toString() !== routeNumber.toString()) {
+        console.warn(`Attempt to delete message ${messageId} from mismatched room. Expected ${routeNumber}, got ${message.roomId}`);
         return false;
       }
 
-      // Only allow sender or admin to delete
+      // Only allow sender or admin to delete, but if already deleted, treat as success
       if (message.senderId.toString() !== userId && message.senderRole !== 'admin') {
+        if (message.deleted) {
+          console.warn(`Unauthorized delete on already-deleted message ${messageId}, treating as success`);
+          return true;
+        }
         throw new Error('Unauthorized to delete this message');
+      }
+
+      if (message.deleted) {
+        console.log(`Message ${messageId} already marked deleted, treating as success`);
+        return true;
       }
 
       message.deleted = true;

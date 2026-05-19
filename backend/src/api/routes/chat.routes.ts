@@ -20,8 +20,11 @@ router.post('/send', chatLimiter, sendMessage);
 // Get chat history
 router.get('/history', getChatHistory);
 
-// Delete message
+// Delete message (legacy path)
 router.delete('/delete/:messageId', deleteMessage);
+
+// Delete message (new path used by mobile app)
+router.delete('/message/:messageId', deleteMessage);
 
 // Clear room messages (admin only)
 router.delete('/clear/:routeNumber', clearRoomMessages);

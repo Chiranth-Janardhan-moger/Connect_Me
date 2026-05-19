@@ -14,8 +14,10 @@ router.use(auth_middleware_1.verifyToken);
 router.post('/send', rateLimiter_1.chatLimiter, chat_controller_1.sendMessage);
 // Get chat history
 router.get('/history', chat_controller_1.getChatHistory);
-// Delete message
+// Delete message (legacy path)
 router.delete('/delete/:messageId', chat_controller_1.deleteMessage);
+// Delete message (new path used by mobile app)
+router.delete('/message/:messageId', chat_controller_1.deleteMessage);
 // Clear room messages (admin only)
 router.delete('/clear/:routeNumber', chat_controller_1.clearRoomMessages);
 // Get room statistics (admin only)

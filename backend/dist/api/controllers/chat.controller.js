@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getRoomStats = exports.clearRoomMessages = exports.deleteMessage = exports.getChatHistory = exports.sendMessage = void 0;
 const chat_service_1 = __importDefault(require("../services/chat.service"));
+const user_model_1 = __importDefault(require("../../models/user.model"));
 /**
  * Send message (save to database)
  */
@@ -12,20 +13,37 @@ const sendMessage = async (req, res) => {
     try {
         const { routeNumber, encryptedContent, timestamp } = req.body;
         const user = req.user;
+        console.log('📨 [CHAT] Received message request:', {
+            routeNumber,
+            encryptedContentLength: encryptedContent?.length,
+            userId: user?.id,
+            userName: user?.name,
+            userRole: user?.role,
+        });
         if (!routeNumber || !encryptedContent) {
+            console.error('❌ [CHAT] Missing required fields');
             return res.status(400).json({ error: 'Missing required fields' });
         }
         // Validate message length (encrypted content should be reasonable)
         if (encryptedContent.length > 10000) {
+            console.error('❌ [CHAT] Message too long:', encryptedContent.length);
             return res.status(400).json({ error: 'Message too long' });
         }
+        // Fetch user name from database since JWT doesn't include it
+        const userDoc = await user_model_1.default.findById(user.id).select('name');
+        if (!userDoc) {
+            console.error('❌ [CHAT] User not found:', user.id);
+            return res.status(404).json({ error: 'User not found' });
+        }
+        console.log('💾 [CHAT] Attempting to save message...');
         const message = await chat_service_1.default.saveMessage({
             roomId: routeNumber.toString(),
             senderId: user.id,
-            senderName: user.name,
+            senderName: userDoc.name,
             senderRole: user.role,
             encryptedContent,
         });
+        console.log('✅ [CHAT] Message saved successfully:', message._id);
         res.json({
             success: true,
             message: {
@@ -35,8 +53,14 @@ const sendMessage = async (req, res) => {
         });
     }
     catch (error) {
-        console.error('Send message error:', error);
-        res.status(500).json({ error: 'Failed to send message' });
+        console.error('❌ [CHAT] Send message error:', error);
+        console.error('❌ [CHAT] Error name:', error.name);
+        console.error('❌ [CHAT] Error message:', error.message);
+        console.error('❌ [CHAT] Error stack:', error.stack);
+        res.status(500).json({
+            error: 'Failed to send message',
+            details: error.message
+        });
     }
 };
 exports.sendMessage = sendMessage;
@@ -73,10 +97,11 @@ const deleteMessage = async (req, res) => {
     try {
         const { messageId } = req.params;
         const user = req.user;
+        const { routeNumber, forEveryone } = req.body || {};
         if (!messageId) {
             return res.status(400).json({ error: 'Message ID required' });
         }
-        const deleted = await chat_service_1.default.deleteMessage(messageId, user.id);
+        const deleted = await chat_service_1.default.deleteMessage(messageId, user.id, routeNumber);
         if (!deleted) {
             return res.status(404).json({ error: 'Message not found' });
         }

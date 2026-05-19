@@ -14,6 +14,7 @@ const notification_routes_1 = __importDefault(require("./api/routes/notification
 const appVersion_routes_1 = __importDefault(require("./api/routes/appVersion.routes"));
 const chat_routes_1 = __importDefault(require("./api/routes/chat.routes"));
 const sos_routes_1 = __importDefault(require("./api/routes/sos.routes"));
+const bugReport_routes_1 = __importDefault(require("./api/routes/bugReport.routes"));
 const app = (0, express_1.default)();
 // Middleware
 app.use((0, cors_1.default)({
@@ -55,4 +56,5 @@ app.use('/api/notifications', notification_routes_1.default);
 app.use('/api/app', appVersion_routes_1.default);
 app.use('/api/chat', chat_routes_1.default);
 app.use('/api/sos', sos_routes_1.default);
+app.use('/api/bug-reports', bugReport_routes_1.default);
 exports.default = app;

@@ -1,181 +1,406 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView,Image } from 'react-native';
-import MapView, { Polyline, Marker } from 'react-native-maps';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+// Map.jsx - MAIN COMPONENT
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  View,
+  StyleSheet,
+  StatusBar,
+  ActivityIndicator,
+  Text,
+} from 'react-native';
+import OpenStreetMapView from './components/OpenStreetMapView';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { studentAPI } from '../src/config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BANGALORE_STOPS, DEFAULT_REGION } from '../src/constants/routes';
+import { useLocation } from '../src/hooks/useLocation';
+import { useBusTracking } from '../src/hooks/useBusTracking';
+import { MapHeader } from './components/MapHeader';
+import { StatusBanner } from './components/StatusBanner';
+import { ETACard } from './components/ETACard';
+import ErrorBoundary from './components/ErrorBoundary';
+import { showErrorAlert, showWarningAlert } from './components/CustomAlert';
+import { fetchETA } from '../src/services/etaService';
+import { getPreloaded } from '../src/services/mapPreload';
 
-// Mock data - Replace this with your database/API call
-const ROUTE_DATA = {
-  1: {
-    routeId: 1,
-    routeName: "Route-1",
-    stops: [
-      { id: 1, name: "Yelahanka New Town", lat: 13.1007, lng: 77.5963, time: "06:00 AM" },
-      { id: 2, name: "Yelahanka Old Town", lat: 13.0950, lng: 77.5940, time: "06:10 AM" },
-      { id: 3, name: "Jakkur Cross", lat: 13.0850, lng: 77.5980, time: "06:20 AM" },
-      { id: 4, name: "Hebbal Flyover", lat: 13.0358, lng: 77.5970, time: "06:35 AM" },
-      { id: 5, name: "Mekhri Circle", lat: 13.0157, lng: 77.5850, time: "06:50 AM" },
-    ]
-  },
-  2: {
-    routeId: 2,
-    routeName: "Route-2",
-    stops: [
-      { id: 1, name: "BMSIT College", lat: 13.133845, lng:77.568760, time: "06:30 AM" },
-      { id: 2, name: "Puttenahalli Cross", lat: 13.0920, lng: 77.6020, time: "06:40 AM" },
-      { id: 3, name: "Kogilu Cross", lat: 13.0800, lng: 77.6100, time: "06:50 AM" },
-      { id: 4, name: "Nagavara", lat: 13.0520, lng: 77.6150, time: "07:05 AM" },
-      { id: 5, name: "Hennur Cross", lat: 13.0380, lng: 77.6380, time: "07:20 AM" },
-      { id: 6, name: "Tin Factory", lat: 13.0280, lng: 77.6280, time: "07:30 AM" },
-    ]
-  },
-  3: {
-    routeId: 3,
-    routeName: "Route-3",
-    stops: [
-      { id: 1, name: "Yelahanka", lat: 13.1007, lng: 77.5963, time: "07:00 AM" },
-      { id: 2, name: "Attur", lat: 13.0720, lng: 77.5820, time: "07:15 AM" },
-      { id: 3, name: "Sadashivanagar", lat: 13.0100, lng: 77.5750, time: "07:30 AM" },
-      { id: 4, name: "Majestic", lat: 12.9767, lng: 77.5713, time: "07:50 AM" },
-    ]
-  },
-};
-
-
-export default function Map() {
+function MapScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const routeId = params.routeId || '2';
-  
-  const [viewMode, setViewMode] = useState('map');
-  
-  const routeData = ROUTE_DATA[routeId] || ROUTE_DATA[2];
-  
-  const polylineCoords = routeData.stops.map(stop => ({
-    latitude: stop.lat,
-    longitude: stop.lng,
-  }));
-  
-  const initialRegion = {
-    latitude: routeData.stops[0].lat,
-    longitude: routeData.stops[0].lng,
-    latitudeDelta: 0.15,
-    longitudeDelta: 0.15,
+  const mapRef = useRef(null);
+  const insets = useSafeAreaInsets();
+
+  const [loading, setLoading] = useState(true);
+  const [gpsLoading, setGpsLoading] = useState(true);
+  const [mapError, setMapError] = useState(false);
+  const [routeData, setRouteData] = useState(null);
+  const [etaText, setEtaText] = useState(null);
+  const [distanceText, setDistanceText] = useState(null);
+  const [stopsAway, setStopsAway] = useState(null);
+  const hasCenteredMap = useRef(false);
+  const hasCenteredOnBus = useRef(false);
+  const mapReadyRef = useRef(false);
+
+  const {
+    location: studentLocation,
+    animatedCoord: studentAnimatedCoordRef,
+    initLocation,
+    startTracking,
+    ensureAnimatedFromLocation,
+    isTracking,
+    error: locationError,
+  } = useLocation();
+
+  const {
+    busLocation,
+    busAnimatedCoord: busAnimatedCoordRef,
+    tripStatus,
+    checkTripStatus,
+  } = useBusTracking();
+
+  const fetchRouteData = async () => {
+    try {
+      // Prefer cached user data to avoid network
+      const userStr = await AsyncStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        const rn = typeof user?.routeNumber === 'number' ? user.routeNumber : parseInt(user?.routeNumber);
+        if (!isNaN(rn)) {
+          const localRouteData = BANGALORE_STOPS[rn];
+          if (localRouteData) {
+            setRouteData(localRouteData);
+            return;
+          }
+        }
+      }
+
+      // Fallback to API if needed
+      const response = await studentAPI.getRouteInfo();
+      if (response.ok && response.data) {
+        const routeNumber = response.data.routeNumber;
+        const localRouteData = BANGALORE_STOPS[routeNumber];
+        if (localRouteData) setRouteData(localRouteData);
+      }
+
+      if (!routeData) {
+        const defaultRoute = BANGALORE_STOPS[1] || Object.values(BANGALORE_STOPS)[0];
+        if (defaultRoute) setRouteData(defaultRoute);
+      }
+    } catch (error) {
+      console.error('Fetch route error:', error);
+      console.warn('Using default route due to error');
+      // Use a default route instead of showing error
+      const defaultRoute = BANGALORE_STOPS[1] || Object.values(BANGALORE_STOPS)[0];
+      if (defaultRoute) {
+        setRouteData(defaultRoute);
+      } else {
+      }
+    }
   };
+
+  const updateETA = async () => {
+    console.log('📍 Update ETA - busLocation:', busLocation, 'studentLocation:', studentLocation);
+    
+    if (!busLocation || !studentLocation) {
+      console.log('⚠️ Cannot calculate ETA - missing locations');
+      setEtaText(null);
+      setDistanceText(null);
+      setStopsAway(null);
+      return;
+    }
+
+    try {
+      console.log('🧮 Calculating ETA...');
+      const result = await fetchETA(
+        busLocation, 
+        studentLocation, 
+        routeData?.stops || null
+      );
+      
+      console.log('✅ ETA calculated:', result);
+      setEtaText(result.etaText);
+      setDistanceText(result.distanceText);
+      
+      if (result.stopsAway !== undefined) {
+        setStopsAway(result.stopsAway);
+      }
+    } catch (error) {
+      console.error('❌ Update ETA error:', error);
+    }
+  };
+
+  const centerMapOnLocation = (location) => {
+    try {
+      if (mapRef.current && location && !hasCenteredMap.current && mapReadyRef.current) {
+        hasCenteredMap.current = true;
+        setTimeout(() => {
+          try {
+            mapRef.current?.animateToRegion(
+              {
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.02,
+                longitudeDelta: 0.02,
+              },
+              1000
+            );
+          } catch (animError) {
+            console.warn('Map animation failed:', animError);
+          }
+        }, 500);
+      }
+    } catch (err) {
+      console.warn('Center map error:', err);
+    }
+  };
+
+  // Center map when first busLocation arrives
+  useEffect(() => {
+    try {
+      if (busLocation && mapRef.current && !hasCenteredOnBus.current) {
+        hasCenteredOnBus.current = true;
+        mapRef.current.animateToRegion(
+          {
+            latitude: busLocation.latitude,
+            longitude: busLocation.longitude,
+            latitudeDelta: 0.02,
+            longitudeDelta: 0.02,
+          },
+          800
+        );
+      }
+    } catch (_) {}
+  }, [busLocation]);
+
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const pre = getPreloaded();
+        if (pre?.routeData?.routeNumber) {
+          const localRouteData = BANGALORE_STOPS[pre.routeData.routeNumber];
+          if (localRouteData) setRouteData(localRouteData);
+        }
+        if (!routeData) {
+          await fetchRouteData();
+        }
+
+        // ALWAYS start location tracking
+        console.log('🔍 Initializing student location...');
+        setGpsLoading(true);
+        
+        try {
+          console.log('🚀 Starting location initialization...');
+          const loc = await initLocation();
+          if (loc) {
+            console.log('✅ Got initial location:', loc.latitude, loc.longitude);
+            try { ensureAnimatedFromLocation(loc); } catch (_) {}
+            centerMapOnLocation(loc);
+            setGpsLoading(false);
+            
+            // Start tracking after getting initial location
+            setTimeout(() => {
+              console.log('🎯 Starting location tracking...');
+              startTracking();
+            }, 1000);
+          } else {
+            console.warn('⚠️ initLocation() returned null - GPS failed');
+            setGpsLoading(false);
+            
+            // Show clean error alert without fake location
+            if (locationError) {
+              showWarningAlert(
+                '📍 Location Required',
+                locationError + 
+                '\n\nTo track the bus, we need your location.\n\nPlease:\n• Enable GPS in your phone settings\n• Grant location permission to this app\n• Go outdoors or near a window\n• Wait 30-60 seconds for GPS to lock'
+              );
+            }
+          }
+        } catch (locationError) {
+          console.warn('❌ Location init failed:', locationError.message);
+          setGpsLoading(false);
+          
+          showErrorAlert(
+            '📍 Location Error',
+            locationError.message + 
+            '\n\nTo track the bus, we need your location.\n\nPlease:\n• Enable GPS in your phone settings\n• Grant location permission to this app\n• Go outdoors or near a window\n• Restart the app and wait 30-60 seconds'
+          );
+        }
+
+        // Try to get bus location
+        try {
+          const busLoc = await checkTripStatus();
+          if (busLoc) {
+            centerMapOnLocation(busLoc);
+          }
+        } catch (busError) {
+          console.warn('Bus location check failed:', busError);
+        }
+      } catch (error) {
+        console.error('Init error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    init();
+  }, []);
+
+  useEffect(() => {
+    // Only calculate ETA when trip is active (ON_ROUTE) and we have valid locations
+    if (tripStatus === 'ON_ROUTE' && busLocation && studentLocation && routeData) {
+      updateETA();
+      const interval = setInterval(updateETA, 30000);
+      return () => clearInterval(interval);
+    } else {
+      // Clear ETA when trip isn't active
+      setEtaText(null);
+      setDistanceText(null);
+      setStopsAway(null);
+    }
+  }, [tripStatus, busLocation, studentLocation, routeData]);
+
+  // Poll fallback to keep bus location fresh if socket fails
+  useEffect(() => {
+    if (tripStatus === 'ON_ROUTE') {
+      const id = setInterval(() => {
+        try { checkTripStatus(); } catch (_) {}
+      }, 10000);
+      return () => clearInterval(id);
+    }
+  }, [tripStatus]);
+
+  const polylineCoords = useMemo(() => {
+    return (
+      routeData?.stops?.map((stop) => ({
+        latitude: stop.lat,
+        longitude: stop.lng,
+      })) || []
+    );
+  }, [routeData]);
+
+  const initialRegion = useMemo(() => {
+    if (studentLocation) {
+      return {
+        latitude: studentLocation.latitude,
+        longitude: studentLocation.longitude,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      };
+    }
+    if (routeData?.stops?.[0]) {
+      return {
+        latitude: routeData.stops[0].lat,
+        longitude: routeData.stops[0].lng,
+        latitudeDelta: 0.15,
+        longitudeDelta: 0.15,
+      };
+    }
+    return DEFAULT_REGION;
+  }, [studentLocation, routeData]);
+
+  // Extract stable coordinate values to prevent unnecessary re-renders
+  const studentLat = studentLocation?.latitude;
+  const studentLng = studentLocation?.longitude;
+  const busLat = busLocation?.latitude;
+  const busLng = busLocation?.longitude;
+  
+
+  // Create stable markers array
+  const mapMarkers = useMemo(() => {
+    const markers = [];
+    
+    // 1. Route stops (NEVER change - add once)
+    if (routeData?.stops) {
+      routeData.stops.forEach((stop, index) => {
+        markers.push({
+          id: `stop-${stop.id}`,
+          coordinate: { latitude: stop.lat, longitude: stop.lng },
+          type: index === 0 ? 'start' : (index === routeData.stops.length - 1 ? 'end' : 'middle'),
+          title: `${stop.name} - ${stop.time}`
+        });
+      });
+    }
+    
+    // 2. Bus marker (only when trip is active)
+    console.log('🚌 Bus check - tripStatus:', tripStatus, 'busLat:', busLat, 'busLng:', busLng);
+    if (tripStatus === 'ON_ROUTE' && busLat != null && busLng != null) {
+      console.log('✅ Adding bus marker:', busLat, busLng);
+      markers.push({
+        id: 'bus',
+        coordinate: { latitude: busLat, longitude: busLng },
+        type: 'bus',
+        title: 'Bus - Live Location'
+      });
+    } else if (tripStatus === 'ON_ROUTE') {
+      console.log('⚠️ Trip is ON_ROUTE but no bus coordinates');
+    }
+    
+    // 3. Student marker (your location) - only show if location is available
+    if (studentLat != null && studentLng != null) {
+      console.log('✅ Adding student marker:', studentLat, studentLng);
+      markers.push({
+        id: 'student',
+        coordinate: { latitude: studentLat, longitude: studentLng },
+        type: 'student',
+        title: 'Your Location'
+      });
+    }
+    // No fallback marker - clean UI without fake location
+    
+    console.log('📊 Total markers in array:', markers.length);
+    return markers;
+  }, [routeData, tripStatus, busLat, busLng, studentLat, studentLng]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="#E3F2FD" />
+        <MapHeader
+          routeName={routeData?.routeName || 'Loading...'}
+          onBack={() => router.back()}
+          topInset={insets.top || 16}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2981f3ff" />
+          <Text style={styles.loadingText}>Initializing map...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#E3F2FD" />
-      
-      {/* Map - Full Screen */}
-      <MapView
+
+      <OpenStreetMapView
+        ref={mapRef}
         style={styles.map}
         initialRegion={initialRegion}
-      >
-        {/* Route Polyline */}
-        <Polyline
-          coordinates={polylineCoords}
-          strokeColor="#2981f3ff"
-          strokeWidth={4}
-        />
-        
-        {/* Custom Bus Stop Markers using SVG-like circles */}
-        {routeData.stops.map((stop, index) => {
-          const isFirst = index === 0;
-          const isLast = index === routeData.stops.length - 1;
-          
-          return (
-            <Marker
-              key={stop.id}
-              coordinate={{
-                latitude: stop.lat,
-                longitude: stop.lng,
-              }}
-              anchor={{ x: 0.5, y: 0.5 }}
-              centerOffset={{ x: 0, y: 0 }}
-            >
-              <View style={[
-                styles.customMarker,
-                isFirst && styles.startMarker,
-                isLast && styles.endMarker,
-                !isFirst && !isLast && styles.middleMarker
-              ]}>
-                <View style={styles.innerCircle} />
-              </View>
-            </Marker>
-          );
-        })}
-      </MapView>
+        markers={mapMarkers}
+        polyline={polylineCoords}
+        onMapReady={() => {
+          mapReadyRef.current = true;
+        }}
+        mapRef={mapRef}
+      />
 
-      {/* Header - Overlay on Map */}
-      <View style={styles.headerContainer}>
-      <View style={styles.headerContent}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Image
-          source={require('../assets/images/BackButton.png')}
-          style={styles.backImage}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
+      <MapHeader
+        routeName={routeData.routeName}
+        onBack={() => router.back()}
+        topInset={insets.top || 16}
+      />
 
+      <StatusBanner
+        tripStatus={tripStatus}
+        onRefresh={checkTripStatus}
+        topOffset={(insets.top || 16) + 56}
+      />
 
-        <Text style={styles.headerTitle}>{routeData.routeName}</Text>
-
-        {/* Placeholder to balance layout */}
-        <View style={styles.rightPlaceholder} />
-      </View>
-      </View>
-
-
-      {/* List View Overlay */}
-      {viewMode === 'list' && (
-        <View style={styles.listOverlay}>
-          <ScrollView style={styles.listContainer}>
-            {routeData.stops.map((stop, index) => (
-              <View key={stop.id} style={styles.stopItem}>
-                <View style={styles.stopIndicator}>
-                  <View style={[
-                    styles.stopDot,
-                    index === 0 && styles.startDot,
-                    index === routeData.stops.length - 1 && styles.endDot
-                  ]} />
-                  {index < routeData.stops.length - 1 && (
-                    <View style={styles.stopLine} />
-                  )}
-                </View>
-                <View style={styles.stopDetails}>
-                  <Text style={styles.stopName}>{stop.name}</Text>
-                  <Text style={styles.stopTime}>{stop.time}</Text>
-                  {index === 0 && <Text style={styles.stopLabel}>Source</Text>}
-                  {index === routeData.stops.length - 1 && <Text style={styles.stopLabel}>Destination</Text>}
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Toggle Buttons - Overlay on Map */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[styles.toggleButton, viewMode === 'list' && styles.activeToggle]}
-          onPress={() => setViewMode('list')}
-        >
-          <Text style={[styles.toggleText, viewMode === 'list' && styles.activeToggleText]}>
-            list
-          </Text>
-        </TouchableOpacity>
-        
-        <View style={styles.divider} />
-        
-        <TouchableOpacity
-          style={[styles.toggleButton, viewMode === 'map' && styles.activeToggle]}
-          onPress={() => setViewMode('map')}
-        >
-          <Text style={[styles.toggleText, viewMode === 'map' && styles.activeToggleText]}>
-            Map
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <ETACard
+        etaText={etaText}
+        distanceText={distanceText}
+        stopsAway={stopsAway}
+        visible={tripStatus === 'ON_ROUTE'}
+      />
+      
     </View>
   );
 }
@@ -187,211 +412,35 @@ const styles = StyleSheet.create({
   map: {
     ...StyleSheet.absoluteFillObject,
   },
-  header: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#E3F2FD',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  backIcon: {
-    fontSize: 48,
-    color: '#2C2C2C',
-    fontWeight: '400',
-
-  },
-headerContainer: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  backgroundColor: '#E3F2FD',
-  borderBottomLeftRadius: 20,
-  borderBottomRightRadius: 20,
-  zIndex: 100,
-  paddingTop: StatusBar.currentHeight || 40, // makes it safe on all devices
-  paddingBottom: 10,
-  elevation: 6,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.2,
-  shadowRadius: 4,
-},
-backImage: {
-  width: 24,
-  height: 24,
-  tintColor: '#2C2C2C', // makes it match your text color; remove if you want full-color image
-},
-
-headerContent: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  paddingHorizontal: 16,
-},
-
-
-headerTitle: {
-  fontSize: 20,
-  fontWeight: '600',
-  color: '#2C2C2C',
-},
-
-rightPlaceholder: {
-  width: 40, // keeps title centered
-},
-  placeholder: {
-    width: 40,
-  },
-  customMarker: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  startMarker: {
-    backgroundColor: '#4CAF50',
-  },
-  endMarker: {
-    backgroundColor: '#F44336',
-  },
-  middleMarker: {
-    backgroundColor: '#E53935',
-  },
-  innerCircle: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
     backgroundColor: '#fff',
   },
-  listOverlay: {
-    position: 'absolute',
-    top: 80,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.97)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-  },
-  listContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  stopItem: {
-    flexDirection: 'row',
-    marginBottom: 5,
-  },
-  stopIndicator: {
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  stopDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#E53935',
-    zIndex: 1,
-  },
-  startDot: {
-    backgroundColor: '#4CAF50',
-  },
-  endDot: {
-    backgroundColor: '#F44336',
-  },
-  stopLine: {
-    width: 3,
-    flex: 1,
-    backgroundColor: '#FFB300',
-    marginTop: -2,
-    minHeight: 40,
-  },
-  stopDetails: {
-    flex: 1,
-    paddingBottom: 20,
-  },
-  stopName: {
+  loadingText: {
+    marginTop: 16,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2C2C2C',
-    marginBottom: 4,
+    color: '#757575',
   },
-  stopTime: {
+  gpsLoadingText: {
+    marginTop: 8,
     fontSize: 14,
-    color: '#757575',
-    marginBottom: 4,
-  },
-  stopLabel: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  toggleContainer: {
-    position: 'absolute',
-    bottom: 30,
-    left: 80,
-    right: 80,
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderRadius: 30,
-    padding: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 25,
-  },
-  activeToggle: {
-    backgroundColor: '#E3F2FD',
-  },
-  toggleText: {
-    fontSize: 16,
-    color: '#757575',
-    fontWeight: '500',
-  },
-  activeToggleText: {
-    color: '#2C2C2C',
-    fontWeight: '600',
-  },
-  divider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#E0E0E0',
+    color: '#9e9e9e',
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
 });
+
+export default function Map() {
+  const router = useRouter();
+
+  return (
+    <ErrorBoundary
+      onReset={() => console.log('Error boundary reset')}
+      onGoBack={() => router.back()}
+    >
+      <MapScreen />
+    </ErrorBoundary>
+  );
+}

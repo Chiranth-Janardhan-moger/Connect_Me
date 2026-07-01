@@ -1,4 +1,4 @@
-# 🚌 ConnectMe: Smart College Bus Tracking
+#  ConnectMe: Smart College Bus Tracking
 
 <div align="center">
 
@@ -10,7 +10,7 @@
 [![MongoDB](https://img.shields.io/badge/MongoDB-4EA94B?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
 [![Socket.io](https://img.shields.io/badge/Socket.io-010101?style=for-the-badge&logo=socket.io&logoColor=white)](https://socket.io/)
 
-Real-time bus tracking system built with React Native, Node.js, and MongoDB. Track college buses in real-time, get ETAs, and never miss your bus again! 🎯
+Real-time bus tracking system built with React Native, Node.js, and MongoDB. Track college buses in real-time, get ETAs, and never miss your bus again! 
 
 <p align="center">
   <img src="frontend/assets/images/app-preview.gif" alt="ConnectMe App Demo" width="230">
@@ -18,13 +18,13 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
 
 </div>
 
-## ✨ Key Features
+##  Key Features
 
-### 📱 Student Features
+###  Student Features
 <table>
 <tr>
     <td width="50%">
-        <h4>🗺️ Real-time Tracking</h4>
+        <h4>️ Real-time Tracking</h4>
         <ul>
             <li>Live bus location on interactive map</li>
             <li>Accurate ETA for each stop</li>
@@ -32,7 +32,7 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
         </ul>
     </td>
     <td width="50%">
-        <h4>🔔 Smart Notifications</h4>
+        <h4> Smart Notifications</h4>
         <ul>
             <li>Bus arrival alerts</li>
             <li>Schedule changes updates</li>
@@ -42,7 +42,7 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
 </tr>
 <tr>
     <td width="50%">
-        <h4>📅 Schedule Management</h4>
+        <h4> Schedule Management</h4>
         <ul>
             <li>View bus timings for each stop</li>
             <li>Access journey history</li>
@@ -50,7 +50,7 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
         </ul>
     </td>
     <td width="50%">
-        <h4>📊 Journey Analytics</h4>
+        <h4> Journey Analytics</h4>
         <ul>
             <li>Travel time statistics</li>
             <li>Delay predictions</li>
@@ -60,11 +60,11 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
 </tr>
 </table>
 
-### 🚌 Driver Features
+###  Driver Features
 <table>
 <tr>
     <td width="50%">
-        <h4>🎯 Trip Management</h4>
+        <h4> Trip Management</h4>
         <ul>
             <li>One-touch trip start/end</li>
             <li>Automatic location updates</li>
@@ -72,7 +72,7 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
         </ul>
     </td>
     <td width="50%">
-        <h4>👥 Passenger Insights</h4>
+        <h4> Passenger Insights</h4>
         <ul>
             <li>Students waiting at stops</li>
             <li>Real-time occupancy tracking</li>
@@ -82,11 +82,11 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
 </tr>
 </table>
 
-### 👨‍💼 Admin Features
+### ‍ Admin Features
 <table>
 <tr>
     <td width="50%">
-        <h4>🎮 Fleet Management</h4>
+        <h4> Fleet Management</h4>
         <ul>
             <li>Real-time fleet monitoring</li>
             <li>Driver assignment system</li>
@@ -94,7 +94,7 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
         </ul>
     </td>
     <td width="50%">
-        <h4>📈 Analytics Dashboard</h4>
+        <h4> Analytics Dashboard</h4>
         <ul>
             <li>Comprehensive transport statistics</li>
             <li>Performance metrics</li>
@@ -119,7 +119,7 @@ Real-time bus tracking system built with React Native, Node.js, and MongoDB. Tra
 - Socket.io
 - JWT Authentication
 
-## 📱 Screenshots
+##  Screenshots
 
 <div align="center">
 <img src="docs/images/login.png" width="200"> <img src="docs/images/map.png" width="200"> <img src="docs/images/stops.png" width="200">
@@ -246,49 +246,49 @@ open ConnectMe.xcworkspace
 # Product > Archive
 ```
 
-## 🎯 Future Roadmap
+##  Future Roadmap
 
 <div align="center">
 <table>
 <tr>
     <td align="center" width="33%">
-        <h3>🌟 Phase 1</h3>
+        <h3> Phase 1</h3>
         <h4>Enhanced Location</h4>
         <br/>
         <p>
-            ⭐ Offline support<br/>
-            ⭐ Background tracking<br/>
-            ⭐ Geofencing alerts<br/>
-            ⭐ Location prediction<br/>
-            ⭐ Better GPS accuracy
+             Offline support<br/>
+             Background tracking<br/>
+             Geofencing alerts<br/>
+             Location prediction<br/>
+             Better GPS accuracy
         </p>
         <br/>
         <h4>Q4 2025</h4>
     </td>
     <td align="center" width="33%">
-        <h3>🌟 Phase 2</h3>
+        <h3> Phase 2</h3>
         <h4>Smart Features</h4>
         <br/>
         <p>
-            ⭐ Seat reservation<br/>
-            ⭐ QR code boarding<br/>
-            ⭐ Bus occupancy live<br/>
-            ⭐ Smart notifications<br/>
-            ⭐ Voice commands
+             Seat reservation<br/>
+             QR code boarding<br/>
+             Bus occupancy live<br/>
+             Smart notifications<br/>
+             Voice commands
         </p>
         <br/>
         <h4>Q1 2026</h4>
     </td>
     <td align="center" width="33%">
-        <h3>🌟 Phase 3</h3>
+        <h3> Phase 3</h3>
         <h4>AI & Analytics</h4>
         <br/>
         <p>
-            ⭐ AI-powered ETAs<br/>
-            ⭐ Route optimization<br/>
-            ⭐ Predictive alerts<br/>
-            ⭐ Carbon tracking<br/>
-            ⭐ Smart scheduling
+             AI-powered ETAs<br/>
+             Route optimization<br/>
+             Predictive alerts<br/>
+             Carbon tracking<br/>
+             Smart scheduling
         </p>
         <br/>
         <h4>Q2 2026</h4>
@@ -304,7 +304,7 @@ open ConnectMe.xcworkspace
 
 </div>
 
-## 👥 Contributing
+##  Contributing
 
 Contributions are always welcome! 
 
@@ -316,7 +316,7 @@ Contributions are always welcome!
 
 Please read our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
-## 🤝 Contributors
+##  Contributors
 
 ### Core Team
 
@@ -353,15 +353,15 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for details.
 </tr>
 </table>
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 📞 Support
+##  Support
 
 For support, email chiranthmoger7@gmail.com 
 
-## 🌟 Acknowledgments
+##  Acknowledgments
 
 - [Expo](https://expo.dev/) for the amazing React Native framework
 - [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) for database hosting
@@ -370,7 +370,7 @@ For support, email chiranthmoger7@gmail.com
 ---
 
 <div align="center">
-Made with ❤️ by <a href="https://github.com/Chiranth-Janardhan-moger">Chiranth Janardhan Moger</a>
+Made with ️ by <a href="https://github.com/Chiranth-Janardhan-moger">Chiranth Janardhan Moger</a>
 </div>
 
 
